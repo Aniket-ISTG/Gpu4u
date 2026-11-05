@@ -68,7 +68,7 @@ export default function WorkloadAnalyzer() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-widest text-cyan-400">
-            GROQ WORKLOAD ANALYZER
+            AI WORKLOAD ANALYZER
           </p>
           <h2 className="mt-2 text-xl font-semibold">Describe your compute request</h2>
         </div>

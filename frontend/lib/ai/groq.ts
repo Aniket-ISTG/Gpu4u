@@ -50,7 +50,7 @@ export async function analyzeWorkload(
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new WorkloadAnalyzerError(
-      "Workload analysis is not configured. Set GROQ_API_KEY in .env.local.",
+      "AI workload analysis is not configured. Contact the administrator.",
       503,
     );
   }
@@ -89,7 +89,7 @@ export async function analyzeWorkload(
       );
     }
     throw new WorkloadAnalyzerError(
-      "Could not reach the Groq workload analysis service.",
+      "Could not reach the AI workload analysis service.",
       502,
     );
   }
@@ -97,12 +97,12 @@ export async function analyzeWorkload(
   if (!response.ok) {
     const message =
       response.status === 401
-        ? "Groq rejected GROQ_API_KEY. Verify the server-side key."
+        ? "The AI service could not authenticate this request. Contact the administrator."
         : response.status === 429
-          ? "Groq rate limit reached. Please try again shortly."
+          ? "The AI service is temporarily busy. Please try again shortly."
           : response.status === 400
-            ? "Groq rejected the request. Check that GROQ_MODEL supports structured outputs."
-            : "Groq returned an error while analyzing the workload.";
+            ? "The AI service could not process this request. Please try again or simplify it."
+            : "The AI workload analysis service returned an error. Please try again.";
 
     throw new WorkloadAnalyzerError(message, response.status === 429 ? 429 : 502);
   }
@@ -112,7 +112,7 @@ export async function analyzeWorkload(
     responseBody = await response.json();
   } catch {
     throw new WorkloadAnalyzerError(
-      "Groq returned malformed data.",
+      "The AI service returned malformed data.",
       502,
     );
   }
@@ -124,7 +124,7 @@ export async function analyzeWorkload(
 
   if (!content) {
     throw new WorkloadAnalyzerError(
-      "Groq returned no structured workload result.",
+      "The AI service returned no structured workload result.",
       502,
     );
   }
@@ -133,7 +133,7 @@ export async function analyzeWorkload(
     return parseWorkloadAnalysis(JSON.parse(content));
   } catch {
     throw new WorkloadAnalyzerError(
-      "Groq's workload response did not match the required schema.",
+      "The AI service response did not match the required schema.",
       502,
     );
   }
