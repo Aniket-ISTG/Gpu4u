@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import type { WorkloadAnalysis } from "@/lib/validation/workload.schema";
+import { DIFFICULTY_OPTIONS } from "@/lib/estimation/difficulty";
+import type { Difficulty } from "@/lib/validation/workload.schema";
 import { SparklesIcon, ZapIcon, CopyIcon, CheckIcon, ArrowRightIcon } from "./icons";
 
 const fields: Array<{
@@ -14,6 +16,7 @@ const fields: Array<{
   { key: "gpuCount", label: "GPU count" },
   { key: "maxHourlyBudgetUsd", label: "Hourly budget" },
   { key: "optimization", label: "Optimization" },
+  { key: "difficulty", label: "Difficulty" },
   { key: "cudaRequired", label: "CUDA required" },
 ];
 
@@ -56,6 +59,8 @@ function getSourceBadge(source: string) {
 }
 
 interface WorkloadAnalyzerProps {
+  /** Called with the difficulty in the validated payload (selected or auto-detected). */
+  onDifficulty?: (difficulty: Difficulty) => void;
   onApplyRequirements?: (specs: {
     minMemory?: number;
     maxPrice?: number;
@@ -71,8 +76,10 @@ interface WorkloadAnalyzerProps {
   }) => void;
 }
 
-export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: WorkloadAnalyzerProps) {
+export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs, onDifficulty }: WorkloadAnalyzerProps) {
   const [request, setRequest] = useState("");
+  // "" = let the AI auto-detect the difficulty.
+  const [difficultyChoice, setDifficultyChoice] = useState<Difficulty | "">("");
   const [analysis, setAnalysis] = useState<WorkloadAnalysis | null>(null);
   const [error, setError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -107,7 +114,10 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
       const response = await fetch("/api/workloads/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request }),
+        body: JSON.stringify({
+          request,
+          ...(difficultyChoice ? { difficulty: difficultyChoice } : {}),
+        }),
       });
       const result = (await response.json()) as {
         analysis?: WorkloadAnalysis;
@@ -119,6 +129,7 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
       }
 
       setAnalysis(result.analysis);
+      onDifficulty?.(result.analysis.difficulty);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -256,6 +267,26 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
           <div className="absolute bottom-3 right-3 text-[11px] font-mono text-[#A5A79B] pointer-events-none">
             {request.length} / 4000
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-[#A5A79B] font-display">
+            <span className="uppercase tracking-wider">Difficulty level</span>
+            <select
+              aria-label="Difficulty level"
+              className="field !w-auto !py-1.5"
+              value={difficultyChoice}
+              onChange={(e) => setDifficultyChoice(e.target.value as Difficulty | "")}
+            >
+              <option value="">Auto-detect</option>
+              {DIFFICULTY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <span className="text-[11px] text-[#A5A79B]">
+            Optional. If you don&apos;t choose, the difficulty is detected automatically.
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">

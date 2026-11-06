@@ -44,7 +44,7 @@ export function estimateDuration(
   gpusUsed: number,
   profile: WorkloadProfile,
 ): DurationEstimate {
-  const { spec, basis } = getGpuSpec(offer.gpuModel, offer.performanceScore);
+  const { spec, basis } = getGpuSpec(offer.gpuKey, offer.vramGb);
   const speedup = multiGpuSpeedup(gpusUsed);
   const params = profile.modelParamsB * 1e9;
   const weightBytes = params * profile.precisionBytes;
@@ -100,8 +100,8 @@ export function estimateDuration(
     requiredVramGb,
     fitsInVram: requiredVramGb <= availableVramGb,
     assumptions:
-      basis === "performance-score-fallback"
-        ? [...assumptions, "GPU not in the spec table; scaled from the H100 by the provider performance score."]
+      basis === "unknown-gpu-fallback"
+        ? [...assumptions, "GPU not in the spec table; assumed to run at 10% of an H100. Low confidence."]
         : assumptions,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import type { RankedGPUOffer } from "./OptimalMatchHero";
+import type { RankedGPUOffer } from "@/lib/marketplace/ranking";
 import {
   SearchIcon,
   GridIcon,
@@ -17,7 +17,8 @@ interface MarketplaceTableProps {
   onSelectOffer: (offer: RankedGPUOffer) => void;
 }
 
-type SortField = "score" | "price" | "vram" | "reliability";
+type SortField = "score" | "price" | "vram";
+const PAGE_SIZE = 100;
 type ViewMode = "table" | "grid";
 
 export default function MarketplaceTable({
@@ -29,6 +30,7 @@ export default function MarketplaceTable({
   const [availableOnly, setAvailableOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortField>("score");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Filter and sort offers
   const filteredOffers = useMemo(() => {
@@ -57,8 +59,6 @@ export default function MarketplaceTable({
           return a.estimatedCost - b.estimatedCost;
         case "vram":
           return b.vramGb - a.vramGb;
-        case "reliability":
-          return (b.reliabilityScore ?? 0) - (a.reliabilityScore ?? 0);
         default:
           return 0;
       }
@@ -155,7 +155,6 @@ export default function MarketplaceTable({
               <option value="score">Ranked Router Score</option>
               <option value="price">Cost: Low to High</option>
               <option value="vram">VRAM: High to Low</option>
-              <option value="reliability">Provider Trust</option>
             </select>
           </div>
 
@@ -213,7 +212,7 @@ export default function MarketplaceTable({
             </thead>
 
             <tbody className="divide-y divide-[#A5A79B]/15 font-sans">
-              {filteredOffers.map((offer, index) => {
+              {filteredOffers.slice(0, visibleCount).map((offer, index) => {
                 const isBest = index === 0 && sortBy === "score";
                 return (
                   <tr
@@ -248,11 +247,6 @@ export default function MarketplaceTable({
                     <td className="p-4 text-[#E8D2B5]/90 whitespace-nowrap font-sans">
                       <div className="flex items-center gap-1.5">
                         <span>{offer.provider}</span>
-                        {offer.reliabilityScore && (
-                          <span className="text-[10px] text-[#A5A79B] font-mono">
-                            ({offer.reliabilityScore}%)
-                          </span>
-                        )}
                       </div>
                     </td>
 
@@ -337,7 +331,7 @@ export default function MarketplaceTable({
       ) : (
         /* Card Grid View (ideal for responsive mobile or cards layout) */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5 sm:p-6">
-          {filteredOffers.map((offer, index) => {
+          {filteredOffers.slice(0, visibleCount).map((offer, index) => {
             const isBest = index === 0 && sortBy === "score";
             return (
               <div
@@ -413,6 +407,21 @@ export default function MarketplaceTable({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {filteredOffers.length > visibleCount && (
+        <div className="flex items-center justify-center gap-3 border-t border-[#A5A79B]/20 p-4 text-xs text-[#A5A79B]">
+          <span>
+            Showing {visibleCount} of {filteredOffers.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            className="rounded-sm border border-[#E8D2B5]/40 bg-[#112540] px-3 py-1 font-bold text-[#E8D2B5] hover:bg-[#18335A] font-display"
+          >
+            Show more
+          </button>
         </div>
       )}
     </section>

@@ -7,6 +7,12 @@ const FieldSourceSchema = z.enum([
   "missing",
 ]);
 
+export const DifficultySchema = z.enum(["easy", "medium", "hard"]);
+export type Difficulty = z.infer<typeof DifficultySchema>;
+
+// Difficulty is always present: either the user chose/stated it, or it was auto-detected.
+const DifficultySourceSchema = z.enum(["user_provided", "estimated"]);
+
 export const WorkloadAnalysisSchema = z
   .object({
     taskType: z
@@ -17,6 +23,7 @@ export const WorkloadAnalysisSchema = z
     gpuCount: z.number().int().positive(),
     maxHourlyBudgetUsd: z.number().positive().nullable(),
     optimization: z.enum(["cost", "performance", "balanced"]),
+    difficulty: DifficultySchema,
     cudaRequired: z.boolean().nullable(),
     fieldSources: z
       .object({
@@ -26,6 +33,7 @@ export const WorkloadAnalysisSchema = z
         gpuCount: FieldSourceSchema,
         maxHourlyBudgetUsd: FieldSourceSchema,
         optimization: FieldSourceSchema,
+        difficulty: DifficultySourceSchema,
         cudaRequired: FieldSourceSchema,
       })
       .strict(),
@@ -76,4 +84,20 @@ export function parseWorkloadAnalysis(input: unknown): WorkloadAnalysis {
   }
 
   return analysis;
+}
+
+/**
+ * Applies the user's dropdown choice. A selection always wins and is marked
+ * user_provided; with no selection the auto-detected difficulty is kept.
+ */
+export function withDifficultySelection(
+  analysis: WorkloadAnalysis,
+  selected: Difficulty | null | undefined,
+): WorkloadAnalysis {
+  if (!selected) return analysis;
+  return {
+    ...analysis,
+    difficulty: selected,
+    fieldSources: { ...analysis.fieldSources, difficulty: "user_provided" },
+  };
 }

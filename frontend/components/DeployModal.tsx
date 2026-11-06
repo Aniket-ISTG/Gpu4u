@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { RankedGPUOffer } from "./OptimalMatchHero";
+import type { RankedGPUOffer } from "@/lib/marketplace/ranking";
 import { XIcon, CopyIcon, CheckIcon, CpuIcon } from "./icons";
 
 interface DeployModalProps {
@@ -16,7 +16,7 @@ export default function DeployModal({ offer, onClose }: DeployModalProps) {
 
   if (!offer) return null;
 
-  const totalCost = (offer.pricePerHourUsd * offer.gpuCount * durationHours).toFixed(2);
+  const totalCost = (offer.bundlePricePerHourUsd * durationHours).toFixed(2);
 
   const sshCommand = `ssh -p 2244 root@node-${offer.region}.gpu4u.network \\
   -i ~/.ssh/gpu4u_ed25519 \\
@@ -79,6 +79,11 @@ export default function DeployModal({ offer, onClose }: DeployModalProps) {
             </p>
           </div>
         </div>
+
+        <p className="mt-4 rounded-sm border border-[#E8D2B5]/30 bg-[#112540]/60 p-3 text-xs text-[#E8D2B5]">
+          Stage 0: provisioning is not connected yet. The commands below are illustrative placeholders, and no GPU is
+          rented from the provider.
+        </p>
 
         {/* Duration & Cost Simulator */}
         <div className="my-5 rounded-sm border border-[#A5A79B]/25 bg-[#091424]/90 p-4">

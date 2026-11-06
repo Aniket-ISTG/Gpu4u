@@ -3,6 +3,8 @@
 import React from "react";
 import type { RoutingResult, RoutedOffer } from "@/lib/routing/cost-ranking";
 
+const MAX_ROWS = 25;
+
 interface Props {
   result: RoutingResult;
   loading: boolean;
@@ -62,7 +64,7 @@ export default function CostRankingTable({ result, loading, optimization, onDepl
               </tr>
             </thead>
             <tbody className="divide-y divide-[#A5A79B]/15">
-              {ranked.map((r) => {
+              {ranked.slice(0, MAX_ROWS).map((r) => {
                 const best = r === selected;
                 return (
                   <tr key={r.offer.id} className={best ? "bg-[#1E3A5F]/40" : "hover:bg-[#112540]/50"}>
@@ -78,6 +80,11 @@ export default function CostRankingTable({ result, loading, optimization, onDepl
                     <td className="p-3 font-mono text-[#E8D2B5]">{usd(r.hourlyPriceUsd)}/hr</td>
                     <td className="p-3 font-mono text-[#E8D2B5]" title={r.estimate.assumptions.join("\n")}>
                       ~{formatHours(r.estimatedDurationHours)}
+                      {r.estimate.specBasis === "unknown-gpu-fallback" && (
+                        <span className="ml-1.5 rounded-sm bg-[#1E3A5F] px-1 py-px text-[9px] text-[#E8D2B5]">
+                          low confidence
+                        </span>
+                      )}
                     </td>
                     <td className="p-3 font-mono font-bold text-[#FAF4EB]">~{usd(r.estimatedTotalCostUsd)}</td>
                     <td className="p-3 font-mono text-[#E8D2B5]">{r.routingScore.toFixed(0)}</td>
@@ -96,6 +103,11 @@ export default function CostRankingTable({ result, loading, optimization, onDepl
             </tbody>
           </table>
         </div>
+      )}
+      {ranked.length > MAX_ROWS && (
+        <p className="border-t border-[#A5A79B]/20 p-3 text-center text-xs text-[#A5A79B]">
+          Showing the best {MAX_ROWS} of {ranked.length} eligible offers.
+        </p>
       )}
     </section>
   );

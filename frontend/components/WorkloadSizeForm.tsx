@@ -14,6 +14,9 @@ interface Props {
   onOptimization: (o: Optimization) => void;
   maxTotalBudgetUsd: number | null;
   onMaxTotalBudget: (v: number | null) => void;
+  difficulty?: string | null;
+  /** Multiplier applied to fields still marked default. */
+  difficultyScale?: number | null;
 }
 
 const TASKS: TaskType[] = ["inference", "training", "fine-tuning", "rendering", "other"];
@@ -54,6 +57,11 @@ export default function WorkloadSizeForm(props: Props) {
         <p className="text-xs text-[#A5A79B]">
           Used to estimate how long each GPU would take. Fields marked default are placeholders until you edit them.
         </p>
+        {props.difficulty ? (
+          <p className="mt-1 text-xs text-[#E8D2B5]">
+            Difficulty <strong>{props.difficulty}</strong>: job volume still marked default is scaled ×{props.difficultyScale} in all estimates.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

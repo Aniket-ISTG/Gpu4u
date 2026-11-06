@@ -5,13 +5,14 @@ import Header from "@/components/Header";
 import AmbientBackground from "@/components/AmbientBackground";
 import WorkloadAnalyzer from "@/components/WorkloadAnalyzer";
 import WorkloadConfigurator from "@/components/WorkloadConfigurator";
-import type { RankedGPUOffer } from "@/components/OptimalMatchHero";
+import type { RankedGPUOffer } from "@/lib/marketplace/ranking";
 import WorkloadSizeForm from "@/components/WorkloadSizeForm";
 import CostRankingTable from "@/components/CostRankingTable";
 import SimulatedExecutionPanel from "@/components/SimulatedExecutionPanel";
 import DeployModal from "@/components/DeployModal";
 import Footer from "@/components/Footer";
 import { useMarketplace } from "@/hooks/useMarketplace";
+import { applyDifficulty, DIFFICULTY_SCALE, type Difficulty } from "@/lib/estimation/difficulty";
 import { rankOffersByEstimatedCost, type RoutedOffer } from "@/lib/routing/cost-ranking";
 import {
   DEFAULTS,
@@ -33,19 +34,24 @@ export default function GetStarted() {
   const [optimization, setOptimization] = useState<"cost" | "performance" | "balanced">("cost");
   const [maxTotalBudgetUsd, setMaxTotalBudgetUsd] = useState<number | null>(null);
 
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const effectiveProfile = useMemo(
+    () => applyDifficulty(profile, touched, difficulty),
+    [profile, touched, difficulty]
+  );
+
   const result = useMemo(
     () =>
-      rankOffersByEstimatedCost(offers, profile, {
+      rankOffersByEstimatedCost(offers, effectiveProfile, {
         minVramGb: minMemory,
         gpuCount,
         maxHourlyBudgetUsd: maxPrice,
         maxTotalBudgetUsd,
-        minPerformanceScore: null,
         maxDurationHours: null,
         cudaRequired: null,
         optimization,
       }),
-    [offers, profile, minMemory, gpuCount, maxPrice, maxTotalBudgetUsd, optimization]
+    [offers, effectiveProfile, minMemory, gpuCount, maxPrice, maxTotalBudgetUsd, optimization]
   );
 
   function updateProfile<K extends keyof WorkloadProfile>(key: K, value: WorkloadProfile[K]) {
@@ -114,7 +120,7 @@ export default function GetStarted() {
           </div>
         )}
 
-        <WorkloadAnalyzer onApplySpecs={handleApplyRequirements} />
+        <WorkloadAnalyzer onApplySpecs={handleApplyRequirements} onDifficulty={setDifficulty} />
 
         <WorkloadConfigurator
           minMemory={minMemory}
@@ -135,6 +141,8 @@ export default function GetStarted() {
           onOptimization={setOptimization}
           maxTotalBudgetUsd={maxTotalBudgetUsd}
           onMaxTotalBudget={setMaxTotalBudgetUsd}
+          difficulty={difficulty}
+          difficultyScale={difficulty ? DIFFICULTY_SCALE[difficulty] : null}
         />
 
         <CostRankingTable

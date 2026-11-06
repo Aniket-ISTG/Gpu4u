@@ -4,16 +4,17 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import AmbientBackground from "@/components/AmbientBackground";
+import DataPathPanel from "@/components/DataPathPanel";
 import StatsOverview from "@/components/StatsOverview";
 import MarketplaceTable from "@/components/MarketplaceTable";
 import DeployModal from "@/components/DeployModal";
 import Footer from "@/components/Footer";
-import type { RankedGPUOffer } from "@/components/OptimalMatchHero";
+import type { RankedGPUOffer } from "@/lib/marketplace/ranking";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { browseOffers } from "@/lib/marketplace/ranking";
 
 export default function Home() {
-  const { offers, loading, error, lastUpdated } = useMarketplace();
+  const { offers, loading, error, lastUpdated, stale, meta } = useMarketplace();
   const [selectedOffer, setSelectedOffer] = useState<RankedGPUOffer | null>(null);
   const browsable = useMemo(() => browseOffers(offers), [offers]);
 
@@ -64,10 +65,12 @@ export default function Home() {
           <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-[#A5A79B]">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>
-              Live feed · refreshes every 5s
+              Live from Aquanode · refreshes every 30s{stale ? " · showing last good data (upstream unavailable)" : ""}
               {lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ""}
             </span>
           </div>
+
+          <DataPathPanel meta={meta} />
 
           <MarketplaceTable
             offers={browsable}

@@ -11,7 +11,6 @@ export interface RoutingConstraints {
   maxHourlyBudgetUsd: number | null;
   /** Cap on the estimated total cost of the job. */
   maxTotalBudgetUsd: number | null;
-  minPerformanceScore: number | null;
   maxDurationHours: number | null;
   cudaRequired: boolean | null;
   optimization: Optimization;
@@ -20,7 +19,7 @@ export interface RoutingConstraints {
 export interface RoutedOffer {
   offer: GPUOffer;
   gpusUsed: number;
-  /** Offer price is per GPU-hour; this is the rate for all GPUs used. */
+  /** Whole-offer rate: an offer is a fixed bundle, so all of its GPUs are rented and billed together. */
   hourlyPriceUsd: number;
   estimate: DurationEstimate;
   estimatedDurationHours: number;
@@ -62,20 +61,15 @@ export function rankOffersByEstimatedCost(
 
   for (const offer of offers) {
     const reasons: string[] = [];
-    const hourlyPriceUsd = offer.pricePerHourUsd * gpusUsed;
+    // An offer is a fixed bundle at a fixed price, so we only match bundles of exactly the requested size.
+    const hourlyPriceUsd = offer.bundlePricePerHourUsd;
 
     if (!offer.available) reasons.push("Not available");
     if (constraints.minVramGb !== null && offer.vramGb < constraints.minVramGb) {
       reasons.push(`VRAM ${offer.vramGb} GB below minimum ${constraints.minVramGb} GB`);
     }
-    if (offer.gpuCount < gpusUsed) reasons.push(`Offers ${offer.gpuCount} GPU(s), need ${gpusUsed}`);
+    if (offer.gpuCount !== gpusUsed) reasons.push(`Bundle has ${offer.gpuCount} GPU(s), need exactly ${gpusUsed}`);
     if (constraints.cudaRequired && !offer.cudaSupported) reasons.push("CUDA not supported");
-    if (
-      constraints.minPerformanceScore !== null &&
-      (offer.performanceScore ?? 0) < constraints.minPerformanceScore
-    ) {
-      reasons.push(`Performance score below ${constraints.minPerformanceScore}`);
-    }
     if (constraints.maxHourlyBudgetUsd !== null && hourlyPriceUsd > constraints.maxHourlyBudgetUsd) {
       reasons.push(`Hourly rate $${hourlyPriceUsd.toFixed(2)} exceeds $${constraints.maxHourlyBudgetUsd}/hr budget`);
     }
