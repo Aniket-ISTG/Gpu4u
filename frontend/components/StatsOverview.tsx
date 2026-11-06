@@ -21,10 +21,10 @@ export default function StatsOverview({ offers, loading }: StatsOverviewProps) {
     {
       label: "Total Marketplace Offers",
       value: loading ? "..." : totalOffers.toString(),
-      helper: "Synchronized across 3 networks",
+      helper: "Synchronized across 3 providers",
       icon: ServerIcon,
-      color: "text-blue-400",
-      bgGlow: "from-blue-500/10 to-transparent",
+      accent: "text-[#E8D2B5]",
+      border: "border-[#A5A79B]/30",
     },
     {
       label: "Active Available Nodes",
@@ -33,24 +33,24 @@ export default function StatsOverview({ offers, loading }: StatsOverviewProps) {
         ? "Scanning..."
         : `${Math.round((availableOffers / (totalOffers || 1)) * 100)}% online ready to bind`,
       icon: ActivityIcon,
-      color: "text-emerald-400",
-      bgGlow: "from-emerald-500/10 to-transparent",
+      accent: "text-[#E8D2B5]",
+      border: "border-[#A5A79B]/30",
     },
     {
       label: "Decentralized Providers",
       value: loading ? "..." : uniqueProviders.toString(),
       helper: "Northstar, Vector, Orbit",
       icon: GlobeIcon,
-      color: "text-purple-400",
-      bgGlow: "from-purple-500/10 to-transparent",
+      accent: "text-[#A5A79B]",
+      border: "border-[#A5A79B]/30",
     },
     {
       label: "Floor Compute Rate",
       value: loading ? "..." : `$${lowestRate.toFixed(2)}/hr`,
       helper: "Starting at RTX 3090 / L4 tiers",
       icon: DollarIcon,
-      color: "text-cyan-400",
-      bgGlow: "from-cyan-500/10 to-transparent",
+      accent: "text-[#E8D2B5]",
+      border: "border-[#E8D2B5]/35",
     },
   ];
 
@@ -61,22 +61,26 @@ export default function StatsOverview({ offers, loading }: StatsOverviewProps) {
         return (
           <div
             key={stat.label}
-            className="group relative overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 transition-all duration-200 hover:border-zinc-700/80 hover:bg-zinc-900/70"
+            className="group relative overflow-hidden rounded-md border border-[#A5A79B]/25 bg-[#0E1D33]/75 p-4.5 transition-all duration-200 hover:border-[#E8D2B5]/50 hover:bg-[#112540]/85 shadow-lg"
           >
-            <div
-              className={`absolute -right-4 -top-4 w-20 h-20 rounded-full bg-gradient-to-br ${stat.bgGlow} blur-xl opacity-60 group-hover:opacity-100 transition-opacity`}
-            />
+            {/* Square top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E8D2B5]/30 to-transparent group-hover:via-[#E8D2B5]/80 transition-all" />
+
             <div className="relative flex items-center justify-between">
-              <span className="text-xs font-medium text-zinc-400">{stat.label}</span>
-              <span className={`p-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700/40 ${stat.color}`}>
+              <span className="text-xs font-semibold text-[#A5A79B] font-display uppercase tracking-wider">
+                {stat.label}
+              </span>
+              <span className="p-1.5 rounded-sm bg-[#1E3A5F] border border-[#A5A79B]/30 text-[#E8D2B5]">
                 <Icon className="w-3.5 h-3.5" />
               </span>
             </div>
-            <div className="relative mt-2">
-              <span className="text-2xl font-bold tracking-tight text-white font-mono tabular-nums">
+            <div className="relative mt-2.5">
+              <span className="text-2xl font-bold tracking-tight text-[#FAF4EB] font-display tabular-nums">
                 {stat.value}
               </span>
-              <p className="mt-1 text-[11px] text-zinc-500 truncate">{stat.helper}</p>
+              <p className="mt-1 text-[11px] text-[#A5A79B] truncate font-sans">
+                {stat.helper}
+              </p>
             </div>
           </div>
         );

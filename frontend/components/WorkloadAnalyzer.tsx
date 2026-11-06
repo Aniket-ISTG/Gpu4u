@@ -29,27 +29,27 @@ function getSourceBadge(source: string) {
   switch (source) {
     case "user_provided":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-[#1E3A5F] border border-[#E8D2B5]/40 text-[#E8D2B5] font-semibold">
           User Stated
         </span>
       );
     case "estimated":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
-          AI Inferred
+        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-[#112540] border border-[#A5A79B]/40 text-[#FAF4EB]">
+          Inferred
         </span>
       );
     case "default":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-white/[0.08] text-zinc-400">
+        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-[#0B1728] border border-[#A5A79B]/20 text-[#A5A79B]">
           Default
         </span>
       );
     case "missing":
     default:
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
-          Missing
+        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-[#0E1D33] border border-[#A5A79B]/20 text-[#A5A79B]/70">
+          Omitted
         </span>
       );
   }
@@ -177,49 +177,49 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
   }
 
   return (
-    <section id="analyzer" className="relative rounded-2xl border border-white/[0.08] bg-zinc-950/80 backdrop-blur-xl p-6 shadow-2xl transition-all">
-      {/* Glow accent */}
-      <div className="absolute top-0 right-1/4 w-96 h-32 bg-cyan-500/5 blur-3xl pointer-events-none" />
+    <section id="analyzer" className="relative rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/80 backdrop-blur-xl p-6 shadow-2xl transition-all">
+      {/* Non-AI ambient warmth */}
+      <div className="absolute top-0 right-1/4 w-96 h-32 bg-[#E8D2B5]/5 blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-white/[0.06]">
+      <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-[#A5A79B]/20">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-            <SparklesIcon className="w-5 h-5" />
+          <div className="p-2.5 rounded-md bg-[#1E3A5F] border border-[#E8D2B5]/30 text-[#E8D2B5]">
+            <SparklesIcon className="w-5 h-5 text-[#E8D2B5]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-semibold tracking-widest text-cyan-400 uppercase">
-                AI Workload Parser
+              <span className="text-xs font-display font-bold tracking-widest text-[#E8D2B5] uppercase">
+                Workload Parser
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 border border-cyan-800/40 text-cyan-300">
-                LLM Grounded
+              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono bg-[#1E3A5F] border border-[#A5A79B]/30 text-[#E8D2B5]">
+                Schema Validated
               </span>
             </div>
-            <h2 className="text-lg font-bold text-white tracking-tight mt-0.5">
+            <h2 className="text-lg font-bold text-[#FAF4EB] font-display tracking-tight mt-0.5">
               Natural-Language Compute Specification
             </h2>
           </div>
         </div>
 
-        <div className="text-xs font-mono text-zinc-500 hidden sm:flex items-center gap-1.5">
+        <div className="text-xs font-mono text-[#A5A79B] hidden sm:flex items-center gap-1.5">
           <span>Press</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-white/[0.1] text-zinc-300">⌘</kbd>
+          <kbd className="px-1.5 py-0.5 rounded-sm bg-[#112540] border border-[#A5A79B]/30 text-[#E8D2B5]">⌘</kbd>
           <span>+</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-white/[0.1] text-zinc-300">Enter</kbd>
+          <kbd className="px-1.5 py-0.5 rounded-sm bg-[#112540] border border-[#A5A79B]/30 text-[#E8D2B5]">Enter</kbd>
           <span>to run</span>
         </div>
       </div>
 
       {/* Starter Prompt Presets */}
       <div className="pt-4 flex items-center gap-2 flex-wrap text-xs">
-        <span className="text-zinc-500 text-[11px] font-mono">Example Presets:</span>
+        <span className="text-[#A5A79B] text-[11px] font-display uppercase tracking-wider">Presets:</span>
         {samplePrompts.map((sample) => (
           <button
             key={sample.title}
             type="button"
             onClick={() => setRequest(sample.prompt)}
-            className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-white/[0.06] hover:border-cyan-500/40 hover:text-cyan-300 text-zinc-400 text-xs font-mono transition"
+            className="px-2.5 py-1 rounded-sm bg-[#11243E] border border-[#A5A79B]/25 hover:border-[#E8D2B5]/60 hover:text-[#FAF4EB] text-[#E8D2B5]/90 text-xs font-mono transition"
           >
             {sample.title}
           </button>
@@ -243,24 +243,24 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
             required
             value={request}
           />
-          <div className="absolute bottom-3 right-3 text-[11px] font-mono text-zinc-500 pointer-events-none">
+          <div className="absolute bottom-3 right-3 text-[11px] font-mono text-[#A5A79B] pointer-events-none">
             {request.length} / 4000
           </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[11px] text-zinc-500 font-mono">
-            Structured outputs schema validated server-side. Unstated specs marked as defaults/estimates.
+          <p className="text-[11px] text-[#A5A79B] font-sans">
+            Structured outputs schema validated server-side. Unstated specs marked as defaults or estimates.
           </p>
 
           <button
-            className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-2.5 text-xs font-mono font-bold text-zinc-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_0_15px_-3px_rgba(6,182,212,0.3)]"
+            className="inline-flex items-center gap-2 rounded-md bg-[#E8D2B5] px-5 py-2.5 text-xs font-display font-bold text-[#1E3A5F] transition hover:bg-[#FAF4EB] disabled:cursor-not-allowed disabled:opacity-50 shadow-md"
             disabled={isAnalyzing || request.trim().length < 10}
             type="submit"
           >
             {isAnalyzing ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-[#1E3A5F] border-t-transparent rounded-full animate-spin" />
                 <span>Extracting Specs...</span>
               </>
             ) : (
@@ -275,23 +275,23 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
 
       {/* Error Callout */}
       {error && (
-        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-950/40 p-4 text-xs font-mono text-red-200 flex items-start gap-3">
-          <span className="p-1 rounded bg-red-500/20 text-red-400">✕</span>
+        <div className="mt-4 rounded-md border border-[#1E3A5F] bg-[#112643]/90 p-4 text-xs font-mono text-[#E8D2B5] flex items-start gap-3">
+          <span className="p-1 rounded-sm bg-[#1E3A5F] text-[#FAF4EB]">✕</span>
           <div>
-            <strong className="block font-semibold">Analysis Failed</strong>
-            <p className="mt-0.5 text-zinc-300">{error}</p>
+            <strong className="block font-semibold">Analysis Notice</strong>
+            <p className="mt-0.5 text-[#E8D2B5]/90">{error}</p>
           </div>
         </div>
       )}
 
       {/* Analysis Results */}
       {analysis && (
-        <div className="mt-6 space-y-5 border-t border-white/[0.08] pt-6 animate-in fade-in duration-300">
+        <div className="mt-6 space-y-5 border-t border-[#A5A79B]/20 pt-6 animate-in fade-in duration-300">
           {/* Action Bar: Apply to Filters */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-700/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-md bg-[#112540] border border-[#E8D2B5]/30">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="text-xs font-mono font-medium text-cyan-200">
+              <span className="w-2 h-2 rounded-sm bg-[#E8D2B5] animate-pulse" />
+              <span className="text-xs font-mono font-medium text-[#FAF4EB]">
                 Specs Extracted Successfully
               </span>
             </div>
@@ -300,17 +300,17 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
               <button
                 type="button"
                 onClick={handleApplyToFilters}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-mono font-bold text-xs transition shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#1E3A5F] hover:bg-[#23477A] text-[#E8D2B5] border border-[#E8D2B5]/40 font-display font-bold text-xs transition shadow-sm"
               >
                 {appliedFeedback ? (
                   <>
-                    <CheckIcon className="w-3.5 h-3.5" />
+                    <CheckIcon className="w-3.5 h-3.5 text-[#E8D2B5]" />
                     <span>Applied to Router!</span>
                   </>
                 ) : (
                   <>
                     <span>Apply to Router Filters</span>
-                    <ArrowRightIcon className="w-3.5 h-3.5" />
+                    <ArrowRightIcon className="w-3.5 h-3.5 text-[#E8D2B5]" />
                   </>
                 )}
               </button>
@@ -322,16 +322,16 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
             {fields.map(({ key, label }) => (
               <div
                 key={key}
-                className="rounded-xl bg-zinc-900/60 border border-white/[0.06] p-3.5 hover:border-white/[0.12] transition"
+                className="rounded-md bg-[#0E1D33]/90 border border-[#A5A79B]/25 p-3.5 hover:border-[#E8D2B5]/40 transition"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-mono text-zinc-400">{label}</span>
+                  <span className="text-[11px] font-display uppercase tracking-wider text-[#A5A79B]">{label}</span>
                   {getSourceBadge(analysis.fieldSources[key])}
                 </div>
-                <p className="mt-2 font-mono font-bold text-white text-sm">
+                <p className="mt-2 font-display font-bold text-[#FAF4EB] text-sm">
                   {displayValue(analysis[key], key)}
                 </p>
-                <p className="mt-1 text-[10px] font-mono text-zinc-500">
+                <p className="mt-1 text-[10px] font-mono text-[#A5A79B]/80">
                   Source: {analysis.fieldSources[key].replaceAll("_", " ")}
                 </p>
               </div>
@@ -340,11 +340,11 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
 
           {/* Clarification Questions */}
           {analysis.clarificationQuestions.length > 0 && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-amber-300 font-mono text-xs font-bold">
-                <span>⚠ Clarification Questions</span>
+            <div className="rounded-md border border-[#E8D2B5]/40 bg-[#11243E] p-4 space-y-2">
+              <div className="flex items-center gap-2 text-[#E8D2B5] font-display text-xs font-bold uppercase tracking-wider">
+                <span>Clarification Questions</span>
               </div>
-              <ul className="list-inside list-disc space-y-1 text-xs font-mono text-zinc-300">
+              <ul className="list-inside list-disc space-y-1 text-xs font-sans text-[#FAF4EB]/90">
                 {analysis.clarificationQuestions.map((question) => (
                   <li key={question}>{question}</li>
                 ))}
@@ -353,28 +353,28 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
           )}
 
           {/* Validated JSON Inspector */}
-          <div className="rounded-xl border border-white/[0.06] bg-zinc-900/40 overflow-hidden">
+          <div className="rounded-md border border-[#A5A79B]/25 bg-[#0B1728]/80 overflow-hidden">
             <details className="group">
-              <summary className="cursor-pointer flex items-center justify-between p-3.5 text-xs font-mono text-zinc-400 hover:text-white transition">
+              <summary className="cursor-pointer flex items-center justify-between p-3.5 text-xs font-display text-[#E8D2B5] hover:text-[#FAF4EB] transition">
                 <span className="flex items-center gap-2">
-                  <span className="text-cyan-400">{'</>'}</span>
+                  <span className="text-[#A5A79B]">{'</>'}</span>
                   <span>View Validated JSON Payload</span>
                 </span>
-                <span className="text-[11px] text-zinc-500 group-open:rotate-180 transition-transform">
+                <span className="text-[11px] text-[#A5A79B] group-open:rotate-180 transition-transform">
                   ▼
                 </span>
               </summary>
 
-              <div className="p-4 border-t border-white/[0.06] bg-black/60 relative">
+              <div className="p-4 border-t border-[#A5A79B]/20 bg-[#08111E] relative">
                 <button
                   type="button"
                   onClick={handleCopyJson}
-                  className="absolute top-4 right-4 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono text-zinc-300 transition"
+                  className="absolute top-4 right-4 inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-[#1E3A5F] hover:bg-[#23477A] text-[11px] font-mono text-[#E8D2B5] border border-[#A5A79B]/30 transition"
                 >
                   {jsonCopied ? (
                     <>
-                      <CheckIcon className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
+                      <CheckIcon className="w-3 h-3 text-[#E8D2B5]" />
+                      <span className="text-[#E8D2B5]">Copied</span>
                     </>
                   ) : (
                     <>
@@ -383,7 +383,7 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
                     </>
                   )}
                 </button>
-                <pre className="overflow-x-auto text-xs font-mono leading-relaxed text-cyan-200">
+                <pre className="overflow-x-auto text-xs font-mono leading-relaxed text-[#E8D2B5]">
                   {JSON.stringify(analysis, null, 2)}
                 </pre>
               </div>

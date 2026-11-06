@@ -1,84 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #090a0f;
-  --foreground: #f4f4f5;
-  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Palette requested: Muted Sage grey, Warm Cream Beige, Deep Navy */
+  --color-sage: #A5A79B;
+  --color-cream: #E8D2B5;
+  --color-navy: #1E3A5F;
+  --color-navy-deep: #0C1A2E;
+  --color-navy-dark: #060D18;
+
+  --background: #060D18;
+  --foreground: #FAF4EB;
+
+  /* Square font system stack */
+  --font-sans: "Space Grotesk", "Rajdhani", "Chakra Petch", "Eurostile", "Bank Gothic", -apple-system, sans-serif;
+  --font-display: "Chakra Petch", "Space Grotesk", "Rajdhani", sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-sage: var(--color-sage);
+  --color-cream: var(--color-cream);
+  --color-navy: var(--color-navy);
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: #060D18;
+  background-image: 
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(232, 210, 181, 0.18), transparent 70%),
+    radial-gradient(circle 800px at 10% 25%, rgba(165, 167, 155, 0.14), transparent 60%),
+    radial-gradient(circle 900px at 90% 40%, rgba(30, 58, 95, 0.45), transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(30, 58, 95, 0.35), transparent 65%),
+    linear-gradient(180deg, #08111F 0%, #0E1D33 40%, #070F1C 100%);
+  background-attachment: fixed;
+  color: #FAF4EB;
   font-family: var(--font-sans);
-  letter-spacing: -0.011em;
+  letter-spacing: -0.015em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar styling */
+/* Subtle architectural square grid */
+.square-grid {
+  background-image: 
+    linear-gradient(to right, rgba(165, 167, 155, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(165, 167, 155, 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
+  background: rgba(165, 167, 155, 0.35);
+  border-radius: 2px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(232, 210, 181, 0.6);
 }
 
-/* Modern input field standard styling */
+/* Square input field utility */
 .field {
   width: 100%;
-  background: rgba(18, 20, 29, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background-color: rgba(10, 20, 36, 0.75);
+  border: 1px solid rgba(165, 167, 155, 0.28);
+  border-radius: 6px; /* Square/boxy aesthetic */
   padding: 10px 14px;
-  color: #f4f4f5;
+  color: #FAF4EB;
   font-size: 0.875rem;
+  line-height: 1.25rem;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-sans);
 }
 
 .field:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(22, 25, 36, 0.85);
+  border-color: rgba(232, 210, 181, 0.45);
+  background-color: rgba(14, 28, 48, 0.85);
 }
 
 .field:focus {
-  border-color: rgba(6, 182, 212, 0.6);
-  background: rgba(24, 27, 40, 0.95);
-  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.4), 0 0 16px -3px rgba(6, 182, 212, 0.25);
+  border-color: #E8D2B5;
+  background-color: rgba(16, 31, 53, 0.95);
+  box-shadow: 0 0 0 1px #E8D2B5, 0 0 20px -4px rgba(232, 210, 181, 0.25);
 }
 
-/* Linear-style surface cards */
-.glass-panel {
-  background: rgba(13, 15, 22, 0.7);
+/* Square editorial panels */
+.panel-editorial {
+  background: linear-gradient(145deg, rgba(16, 32, 54, 0.7) 0%, rgba(10, 21, 36, 0.85) 100%);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(165, 167, 155, 0.22);
+  border-radius: 10px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(232, 210, 181, 0.12);
 }
 
-.glass-panel-subtle {
-  background: rgba(18, 20, 29, 0.5);
+.panel-editorial-subtle {
+  background: rgba(14, 27, 46, 0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(165, 167, 155, 0.18);
+  border-radius: 8px;
+}
+
+/* Display square font helper */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
 }
