@@ -27,3 +27,9 @@ Thumbs.db
 *.sln
 *.sw?
 
+
+# Local database and runtime data
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

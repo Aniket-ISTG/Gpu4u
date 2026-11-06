@@ -190,7 +190,7 @@ async function processPayment({
                 requestId: validated.requestId,
                 eventType: "HUMAN_APPROVAL_GRANTED",
                 status: currentStatus,
-                details: { approvalToken }
+                details: { approved: true }
             });
         } else {
             currentStatus = PaymentStatus.APPROVED;

@@ -54,6 +54,7 @@ class HcsAuditLogger {
             console.log("[HCS_LOGGER] Creating new HCS topic for GPU Router Audit Trail...");
             const tx = await new TopicCreateTransaction()
                 .setTopicMemo("GPU_Router_Payment_Audit_Trail")
+                .setSubmitKey(client.operatorPublicKey)
                 .execute(client);
             const receipt = await tx.getReceipt(client);
             this.topicId = receipt.topicId.toString();

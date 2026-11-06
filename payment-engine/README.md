@@ -1,152 +1,130 @@
-# GPU Router Payment & Human Approval Engine (x402 on Hedera)
+# GPU4U Payment Service (x402 on Hedera)
 
-Core payment engine built for the **AI Agents That Pay: x402 on Hedera** track. This engine autonomously handles GPU resource payments (such as NVIDIA H100 rentals), enforces autonomous spending limits (10 HBAR), requests single-use human approvals for high-value transactions, integrates the official x402 v2 protocol on Hedera Testnet, logs immutable audit events to Hedera Consensus Service (HCS), and independently verifies on-chain settlement via Hedera Mirror Nodes.
+The payment half of GPU4U. An AI agent pays for a GPU lease through the x402 protocol on Hedera. Spending limits decide whether it may pay on its own, a person approves anything larger, an independent check confirms the money moved exactly as quoted, and every step is written to a hash-chained audit log that is anchored on the Hedera Consensus Service.
 
----
+It is a separate Node service. The web app's server calls it with a secret token. The browser never talks to it, and no key ever reaches the browser.
 
-## 1. Project Architecture
+The end-to-end design is in [../docs/x402-agent-workflow.md](../docs/x402-agent-workflow.md).
+
+## Two modes
+
+| | `simulated` (default) | `testnet` |
+| --- | --- | --- |
+| Credentials needed | None | A funded Hedera testnet account, plus a facilitator |
+| Where money moves | An in-memory ledger | The real Hedera testnet |
+| x402 protocol | Real: 402 response, client signing, facilitator verify and settle | Real |
+| Facilitator checks | Real official verification code, simulated submission | Real |
+| HashScan link | None | Yes |
+| Audit anchoring | Local database only | Hedera Consensus Service topic |
+
+Simulated mode exists so the whole flow can run and be tested without credentials. It runs the real x402 packages over real HTTP. Only the final step differs: the facilitator settles on a simulated ledger instead of submitting to Hedera. The service prints a banner and every receipt says so, so a simulated payment can never be mistaken for a real one.
+
+## Quick start
+
+```bash
+cd payment-engine
+cp .env.example .env        # set SERVICE_TOKEN to a long random string
+npm install
+npm start                   # listens on http://127.0.0.1:4021
+```
+
+Then start the web app (see the root README) with the same token as `PAYMENT_SERVICE_TOKEN`.
+
+### Real settlement on Hedera testnet
+
+In testnet the **user's connected wallet signs every payment**; the service never holds a payer key. A local facilitator (official x402 `exact` scheme, `hedera:testnet`) verifies the signed transfer, adds the fee-payer signature and submits it. The lease starts only after the transaction is confirmed on the mirror node. **There are no refunds**: the payment is final, and ending a lease just closes it. The lease time shown is not GPU utilization.
+
+1. Create a receiver account and a separate fee-payer account at https://portal.hedera.com and fund the fee payer.
+2. Set `PAYMENT_MODE=testnet`, `HEDERA_RECEIVER_ID` (no key needed), `FACILITATOR_FEE_PAYER_ID`, `FACILITATOR_FEE_PAYER_KEY`. Startup runs a preflight and refuses to start on any problem; it never falls back to simulated. Mainnet is refused.
+3. `npm run live:check` runs one payment with a stand-in payer key (not HashPack).
+4. Follow [../docs/testnet-manual-test.md](../docs/testnet-manual-test.md) for the real wallet test.
+
+## How a payment works
 
 ```text
-x-402 payment/
-│
-├── payment/
-│   ├── Payment_Service.js       # Core Payment Orchestrator (Idempotent state machine)
-│   ├── Payment_Validator.js     # Request validation, amount precision & duplicate prevention
-│   ├── Spending_Limit.js        # Spending policy evaluation (<= 10 HBAR auto-approved)
-│   ├── Human_Approval.js        # Terminal-based approval with single-use replay-proof tokens
-│   ├── Wallet_Signer.js         # HIP-820 tx builder, EVM-to-Native account resolver & signer
-│   ├── Settlement_Verifier.js   # Mirror node settlement validator (transfer balances & status)
-│   ├── Hcs_Audit_Logger.js      # Hedera Consensus Service (HCS) immutable audit logger
-│   └── x402_Payment_Engine.js   # Official x402 v2 payment scheme (exact transfer & facilitator)
-│
-├── tests/
-│   ├── unit_payment_engine.test.js # Automated 14-scenario unit test suite
-│   └── testnet_integration.js      # Live Hedera Testnet integration test suite
-│
-├── frontend/                    # React + Vite wallet connection & signing bridge
-│   ├── src/
-│   │   ├── config/wallet.js    # Hedera WalletConnect & AppKit configuration
-│   │   └── App.jsx             # Native account verifier & HashPack transaction bridge
-│
-├── index.js                     # Interactive terminal payment CLI
-├── package.json                 # npm scripts & dependencies (@hiero-ledger/sdk, @x402/hedera)
-├── .env                         # Hedera Testnet operator credentials & topic ID
-└── .gitignore                   # Secrets and artifact protection
+quote  ->  policy  ->  [approval]  ->  agent pays (x402)  ->  verify  ->  lease  ->  reconcile
 ```
 
----
+1. **Quote.** The web app's server prices the chosen GPU and asks this service for a quote. The service converts the USD cap to HBAR at the Hedera network exchange rate, rounding up to a whole tinybar, and stores the quote with an expiry. The amount is fixed by the quote. Nothing the browser sends can change it.
+2. **Policy.** The amount is compared with the spending rules (below). The result is `auto`, `approval` or `refuse`.
+3. **Approval** (only for `approval`). The payment is held and saved. Nothing is paid. A person approves or rejects. In `wallet` mode approving needs a wallet signature over the exact terms.
+4. **Agent pays.** The agent calls the lease endpoint. The server answers **402 Payment Required** with the exact price from the stored quote. Before signing, the agent checks the terms against the approved quote: same network, asset HBAR, same recipient, the exact amount, and a fee payer it trusts. It signs a transfer from the agent account, and the facilitator pays the network fee and submits it.
+5. **Verify.** The service does not trust the facilitator's answer. It reads the transaction back from the ledger and checks that the merchant received exactly the quoted amount, the agent paid exactly that, nobody else received value, and the fee payer is a known facilitator.
+6. **Lease.** Only after verification is a lease created. Stage 0 simulates the lease, because renting a real GPU needs an Aquanode account and its private API.
+7. **End.** Ending the lease closes it. The payment is final and nothing is refunded.
 
-## 2. Payment Lifecycle & Status State Machine
+### Payment states
 
-Every payment transitions through strict explicit statuses:
+`RECEIVED`, `POLICY_CHECKED`, `PENDING_APPROVAL`, `APPROVED`, `AWAITING_402`, `SIGNING`, `SUBMITTED`, `CONFIRMED`, `LEASE_ACTIVE`, `RECONCILED`, and the endings `REFUSED`, `REJECTED`, `EXPIRED`, `FAILED`.
 
-```mermaid
-stateDiagram-v2
-    [*] --> RECEIVED: Payment Request Submitted
-    RECEIVED --> VALIDATING: Check Parameters, Idempotency & Provider Details
-    VALIDATING --> PENDING_APPROVAL: Amount > 10 HBAR (Exceeds Policy)
-    VALIDATING --> APPROVED: Amount <= 10 HBAR (Within Autonomous Limit)
-    PENDING_APPROVAL --> APPROVED: Human Operator Grants Approval
-    PENDING_APPROVAL --> REJECTED: Human Operator Rejects Payment
-    APPROVED --> AWAITING_WALLET_SIGNATURE: Request HashPack / Wallet Authorization
-    AWAITING_WALLET_SIGNATURE --> PAYMENT_SUBMITTED: Transaction Signed & Broadcast
-    AWAITING_WALLET_SIGNATURE --> FAILED: Wallet Rejection / Network Error
-    PAYMENT_SUBMITTED --> CONFIRMED: Settlement Verified via Hedera Mirror Node
-    PAYMENT_SUBMITTED --> FAILED: Transaction Failed on Consensus Ledger
-    REJECTED --> [*]
-    CONFIRMED --> [*]
-    FAILED --> [*]
-```
+## Spending policy
 
----
+All limits are in USD, so they do not drift with the HBAR price. They apply to the **cap**, which is the amount actually paid up front.
 
-## 3. Key Components & Implementation Details
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `AUTO_APPROVE_LIMIT_USD` | 0.50 | Up to this, the agent pays by itself |
+| `DAILY_LIMIT_USD` | 5 | One wallet's total in 24 hours. Passing it needs a person |
+| `HARD_CEILING_USD` | 25 | Never paid, and no approval overrides it |
+| `GLOBAL_DAILY_LIMIT_USD` | 50 | Everyone's total in 24 hours. Refused beyond it |
 
-### A. Native HashPack Wallet Integration & Account Resolution
-* **EVM-to-Native Hedera Resolution**: Solves the discrepancy where AppKit/Wagmi reports EVM addresses (`0x667f405f60Dc55Ca7707b18df6c6c0B9915c382B`). Queries the mirror node to verify that it maps to native Hedera account `0.0.11329382`, identifies the key type (`ECDSA_SECP256K1`), retrieves balance, and prevents unregistered EVM-only addresses from being accepted.
-* **Network Verification**: Ensures the connected chain matches `hedera:testnet` (CAIP-2).
-* **HIP-820 Serialization**: Serializes native `TransferTransaction` into Base64-encoded protobuf bytes for HashPack signing via `universalProvider`.
+Also refused: any recipient that is not the merchant account, an expired quote, and a quote that was already used.
 
-### B. Spending Limit & Human Approval Engine
-* **Spending Policy**: Default 10 HBAR limit per transaction.
-* **Replay-Proof Approval Tokens**: When human approval is granted, a cryptographically random, parameter-bound approval token is issued (`appr_<sha256>`). The orchestrator validates that parameters were not modified, checks a 5-minute expiry, and consumes the token upon use to prevent replay attacks.
-* **Rejection Lockout**: Rejection immediately terminates execution and prevents re-execution of the rejected request ID.
+The service-wide limit exists because nothing here proves who is asking. The agent spends the platform's funds, so a per-wallet limit alone could be bypassed by inventing wallet IDs.
 
-### C. Official x402 v2 Protocol on Hedera
-* Uses official `@x402/hedera` and `@x402/core` packages.
-* Implements the `exact` payment scheme targeting `hedera:testnet`:
-  - `PaymentRequirements`: Asset `0.0.0` (native HBAR), amount in tinybars ($1 \text{ HBAR} = 10^8 \text{ tinybars}$), `payTo`, and facilitator `feePayer`.
-  - `PaymentPayload`: `x402Version: 2`, accepted terms, resource lease URL, and Base64-encoded transaction bytes.
-  - Preflight verification via mirror node (`createHederaPreflightTransfer`).
-  - Facilitator settlement flow supporting external HTTP facilitators or local operator facilitator.
+## Human approval
 
-### D. Hedera Consensus Service (HCS) Audit Trail
-* Logs every lifecycle transition to HCS Topic: `0.0.11329896`.
-* Sanitizes payloads to ensure private keys and sensitive data are never recorded on-chain.
-* **Resiliency**: HCS network errors trigger retries and fallback to in-memory audit logs without falsely marking an already settled blockchain transfer as `FAILED`.
+`APPROVAL_MODE=wallet` (recommended for anything real) requires a signature from the quote's wallet over the exact approval text. The text names the approval, quote, payment, wallet, recipient, amount, cap, GPU and expiry. The signature is verified against the account's public key from the mirror node, so it cannot be reused for another payment. Both ED25519 and ECDSA keys work, and the format is what Hedera wallets return from `signMessage`.
 
-### E. Independent Settlement Verification
-* Verifies settlement directly via Hedera Mirror Node (`https://testnet.mirrornode.hedera.com/api/v1/transactions/<txId>`).
-* Confirms `result === "SUCCESS"`, checks debit/credit amounts match expected tinybars, and records consensus timestamps.
+`APPROVAL_MODE=click` accepts an approval without a signature. It is the default so the flow works without a wallet, and the service warns at startup when it is used outside simulated mode.
 
----
+An approval is single use, expires (default 5 minutes, and always before its quote), and a rejection is final. Rejecting needs no signature, because rejecting spends nothing.
 
-## 4. Test Scenarios & Execution
+## Audit log
 
-### Run Automated Unit Test Suite (Mocked & Isolated)
-Runs 14 unit test scenarios with zero network dependencies:
+Every transition is stored and chained: each event includes the hash of the one before it, so changing or removing any event breaks every hash after it. `GET /v1/audit/:paymentId` recomputes the chain.
+
+In testnet mode each event is also posted to a Hedera Consensus Service topic. The message is compact and carries the event hash, which commits to the full details in the database. The topic is created with a **submit key**, so only this service can write to it. Posting is queued and retried, and never blocks or fails a payment. Secrets, signatures and tokens are stripped from event details before anything is stored.
+
+## HTTP API
+
+Everything except health, config, the lease endpoint and the facilitator needs `Authorization: Bearer <SERVICE_TOKEN>`.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /v1/health`, `GET /v1/config` | Public. Mode, limits and account IDs. No secrets |
+| `POST /v1/quotes`, `GET /v1/quotes/:id` | Create and read a quote |
+| `POST /v1/payments` | Start a payment for a quote. Repeating it returns the same payment |
+| `GET /v1/payments/:id` | The payment, quote, approval, lease and audit events |
+| `POST /v1/approvals/:id/decision` | Approve or reject, with an optional wallet signature |
+| `POST /v1/payments/:id/lease/complete` | End the lease (simulated development only); the payment is final |
+| `GET /v1/audit/:paymentId` | Audit events and chain check |
+| `POST /v1/leases` | **The x402-protected endpoint.** 402 first, 200 after payment |
+| `GET /facilitator/supported`, `POST /facilitator/verify`, `/settle` | The local facilitator, in simulated and local modes |
+
+## Safety properties
+
+- The amount is fixed by a server-side quote and cannot be changed by the caller.
+- The agent refuses to sign if the server raises or lowers the price, changes the recipient, uses another asset, or names an untrusted fee payer. The client library's own spend cap is a second layer.
+- A payment is confirmed only after the transaction is read back from the ledger and matches exactly.
+- An approval pays once, even if approved twice at the same moment.
+- Starting the same quote twice, even concurrently, pays once.
+- A payment caught mid-flight by a restart is failed with a note, never retried, so it cannot pay twice. Pending approvals survive a restart.
+
+## Tests
+
 ```bash
-npm test
-```
-**Covered Scenarios:**
-1. Payment of 5 HBAR (within limit) -> Auto-approved
-2. Payment of exactly 10 HBAR (boundary) -> Auto-approved
-3. Payment of 15 HBAR (exceeds limit) -> Requires human approval
-4. Human approves payment -> Issues token and advances
-5. Human rejects payment -> Status `REJECTED`, no blockchain call
-6. Wallet signature rejected -> Fails gracefully
-7. Invalid receiver account ID -> Validation error
-8. Negative or zero amount -> Validation error
-9. Unsupported currency (e.g. ETH) -> Validation error
-10. Wrong network (e.g. mainnet) -> Blocked
-11. Duplicate request ID -> Strict idempotency (no duplicate transfer)
-12. Duplicate request with altered details -> Tampering detection
-13. x402 Payment Requirements & Payload -> Official v2 spec validation
-14. HCS network failure -> In-memory fallback without payment corruption
-
-### Run Real Testnet Integration Tests (Live on Hedera Testnet)
-Executes real transactions on Hedera Testnet, writes to HCS topic, and verifies settlement on mirror node:
-```bash
-npm run test:live
+npm test          # 100 tests, no network, about 7 seconds
+npm run live:check # one real payment on testnet (needs credentials)
 ```
 
----
+The suite covers the conversion math, policy, quotes, approvals in both modes, the audit chain, the Hedera publisher (with the network call stubbed), the verifier, the simulated ledger, and the whole service end to end over HTTP: automatic payment, approval, rejection, expiry, refusal, a hostile server rewriting the terms, an underfunded agent, refunds, restarts and concurrency.
 
-## 5. Stable Interface for Future Backend & Frontend
+## What is not covered
 
-The engine exports clean functions ready to be wrapped in REST endpoints or frontend hooks:
-
-```javascript
-const { processPayment, PaymentStatus } = require("./payment/Payment_Service");
-
-// Example: Calling the engine from a backend router or agent
-const result = await processPayment({
-    requestId: "req_gpu_lease_101",
-    receiverAccountId: "0.0.11326195",
-    amount: 1.5,
-    currency: "HBAR",
-    network: "testnet",
-    protocol: "x402", // or "native"
-    provider: {
-        providerId: "lambdalabs-node-1",
-        gpuModel: "NVIDIA H100 80GB",
-        durationHours: 1,
-        ratePerHour: 1.5
-    }
-});
-
-console.log(result.status);         // "CONFIRMED"
-console.log(result.transactionId);  // "0.0.11326170@1793912526.894421774"
-console.log(result.settlement);     // Settlement details & HashScan link
-```
-
+- **Real testnet settlement has not been run from this repository's tests.** The testnet code paths (real facilitator, mirror verification, Hedera Consensus Service posting, merchant refunds) use the official SDK and packages but need credentials to exercise. Run `npm run live:check` to prove them in your environment.
+- **Real wallet signing has not been tried with HashPack.** The signed payment is tested with a key emulating a wallet, through the official facilitator verification. HashPack accepting it is unverified.
+- **The GPU lease is simulated.** No GPU is rented.
+- **Nothing proves who is asking.** The service-wide limit bounds the agent's exposure, but a production deployment should fund the agent from the user's own wallet and require a signed session.
+- **The simulated ledger resets** when the service restarts. Payments in the database from before the restart can no longer be verified against it.
+- **The original terminal engine** in `payment/` and `index.js` is kept for `npm run cli`. The service reuses only one helper from it, the transaction ID normalizer. Its gaps found in review (fail-open pre-flight, approval token logged on-chain, unused approval timeout, floating-point amounts, a topic with no submit key, a non-exact settlement check) are fixed, and its 14 tests now run with no network and no credentials.

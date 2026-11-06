@@ -100,7 +100,7 @@ function createPaymentPayload({
 /**
  * Verifies an incoming x402 PaymentPayload against on-chain state and scheme requirements.
  */
-async function verifyPaymentPayload(paymentPayload) {
+async function verifyPaymentPayload(paymentPayload, { preflight = null } = {}) {
     if (!paymentPayload || paymentPayload.x402Version !== X402_VERSION) {
         return {
             valid: false,
@@ -170,24 +170,28 @@ async function verifyPaymentPayload(paymentPayload) {
     }
 
     // 4. Preflight account and balance verification via official @x402/hedera helper
+    // Fail closed: if the balance check cannot run, the payment is not safe to send.
+    let preflightResult;
     try {
-        const preflight = createHederaPreflightTransfer();
-        const preflightResult = await preflight({
+        const runPreflight = preflight || createHederaPreflightTransfer();
+        preflightResult = await runPreflight({
             payer: debitEntry.accountId,
             payTo: accepted.payTo,
             asset: accepted.asset || HBAR_ASSET_ID,
             amount: accepted.amount,
             network: accepted.network
         });
-
-        if (!preflightResult.ok) {
-            return {
-                valid: false,
-                error: `Preflight transfer verification failed: ${preflightResult.message || preflightResult.reason}`
-            };
-        }
     } catch (err) {
-        console.warn(`[x402_ENGINE] Preflight warning: ${err.message}`);
+        return {
+            valid: false,
+            error: `Preflight transfer verification could not be completed: ${err.message}`
+        };
+    }
+    if (!preflightResult.ok) {
+        return {
+            valid: false,
+            error: `Preflight transfer verification failed: ${preflightResult.message || preflightResult.reason}`
+        };
     }
 
     return {
@@ -209,10 +213,11 @@ async function settleX402Payment({
     paymentPayload,
     facilitatorUrl = null,
     facilitatorPrivateKey = null,
-    facilitatorAccountId = null
+    facilitatorAccountId = null,
+    preflight = null
 }) {
     // 1. First verify payload
-    const verification = await verifyPaymentPayload(paymentPayload);
+    const verification = await verifyPaymentPayload(paymentPayload, { preflight });
     if (!verification.valid) {
         throw new Error(`Cannot settle invalid x402 payment: ${verification.error}`);
     }

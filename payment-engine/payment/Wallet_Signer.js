@@ -78,6 +78,8 @@ function buildTransferTransaction({
         throw new Error("Invalid parameters for TransferTransaction construction");
     }
 
+    // Whole tinybars avoid the rounding errors floating point HBAR can introduce.
+    const tinybars = BigInt(Math.round(amountHbar * 100_000_000));
     const activeClient = client || Client.forTestnet();
     const shouldCloseClient = !client;
 
@@ -85,8 +87,8 @@ function buildTransferTransaction({
         const tx = new TransferTransaction()
             .setTransactionId(TransactionId.generate(senderAccountId))
             .setNodeAccountIds([new AccountId(3)]) // Default consensus node
-            .addHbarTransfer(senderAccountId, new Hbar(-amountHbar))
-            .addHbarTransfer(receiverAccountId, new Hbar(amountHbar))
+            .addHbarTransfer(senderAccountId, Hbar.fromTinybars(String(-tinybars)))
+            .addHbarTransfer(receiverAccountId, Hbar.fromTinybars(String(tinybars)))
             .setTransactionMemo(memo)
             .freezeWith(activeClient);
 

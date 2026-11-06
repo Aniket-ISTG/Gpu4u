@@ -87,9 +87,9 @@ async function verifySettlement(rawTxId, expected = {}, maxRetries = 6, retryDel
                 if (!receiverTransfer) {
                     transfersVerified = false;
                     transferNotes.push(`Receiver account ${expected.receiverAccountId} not found in transaction transfers`);
-                } else if (BigInt(receiverTransfer.amount) < expectedTinybars) {
+                } else if (BigInt(receiverTransfer.amount) !== expectedTinybars) {
                     transfersVerified = false;
-                    transferNotes.push(`Receiver credited amount (${receiverTransfer.amount} tinybars) is less than expected (${expectedTinybars} tinybars)`);
+                    transferNotes.push(`Receiver credited amount (${receiverTransfer.amount} tinybars) is not exactly the expected ${expectedTinybars} tinybars`);
                 }
             }
 

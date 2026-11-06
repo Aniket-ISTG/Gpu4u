@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { WalletProvider } from "@/components/wallet/WalletProvider";
 
 export const metadata: Metadata = {
   title: "GPU4U — Decentralized Compute Router",
@@ -18,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased dark">
       <body className="min-h-full flex flex-col font-sans text-[#FAF4EB] selection:bg-[#E8D2B5] selection:text-[#1E3A5F]">
-        {children}
+        <WalletProvider>{children}</WalletProvider>
       </body>
     </html>
   );

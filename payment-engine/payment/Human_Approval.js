@@ -81,10 +81,13 @@ async function requestHumanApproval({
         });
 
         try {
-            const answer = await rl.question("Do you authorize this exact GPU payment? Type 'yes' to approve, 'no' to reject: ");
+            const answer = await rl.question(
+                "Do you authorize this exact GPU payment? Type 'yes' to approve, 'no' to reject: ",
+                { signal: AbortSignal.timeout(timeoutMs) }
+            );
             approved = answer.trim().toLowerCase() === "yes" || answer.trim().toLowerCase() === "y";
         } catch (err) {
-            console.error("Failed to read user input:", err.message);
+            console.error(err.name === "AbortError" ? `No answer within ${Math.round(timeoutMs / 1000)}s: treated as rejected.` : `Failed to read user input: ${err.message}`);
             approved = false;
         } finally {
             rl.close();

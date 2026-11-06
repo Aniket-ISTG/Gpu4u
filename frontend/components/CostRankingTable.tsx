@@ -9,7 +9,9 @@ interface Props {
   result: RoutingResult;
   loading: boolean;
   optimization: "cost" | "performance" | "balanced";
-  onDeploy: (r: RoutedOffer) => void;
+  /** The offer currently open in the rent panel. */
+  rentingOfferId?: string | null;
+  onRent: (r: RoutedOffer) => void;
 }
 
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`;
@@ -17,7 +19,7 @@ function formatHours(h: number) {
   return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : `${h.toFixed(2)} h`;
 }
 
-export default function CostRankingTable({ result, loading, optimization, onDeploy }: Props) {
+export default function CostRankingTable({ result, loading, optimization, onRent, rentingOfferId }: Props) {
   const { ranked, rejected, selected } = result;
 
   return (
@@ -91,10 +93,10 @@ export default function CostRankingTable({ result, loading, optimization, onDepl
                     <td className="p-3 text-right">
                       <button
                         type="button"
-                        onClick={() => onDeploy(r)}
+                        onClick={() => onRent(r)}
                         className="rounded-sm border border-[#E8D2B5]/40 bg-[#112540] px-2.5 py-1 font-bold text-[#E8D2B5] hover:bg-[#18335A] font-display"
                       >
-                        Deploy
+                        {rentingOfferId === r.offer.id ? "Selected" : "Rent"}
                       </button>
                     </td>
                   </tr>

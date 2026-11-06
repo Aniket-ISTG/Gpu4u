@@ -5,15 +5,13 @@ import Header from "@/components/Header";
 import AmbientBackground from "@/components/AmbientBackground";
 import WorkloadAnalyzer from "@/components/WorkloadAnalyzer";
 import WorkloadConfigurator from "@/components/WorkloadConfigurator";
-import type { RankedGPUOffer } from "@/lib/marketplace/ranking";
 import WorkloadSizeForm from "@/components/WorkloadSizeForm";
 import CostRankingTable from "@/components/CostRankingTable";
-import SimulatedExecutionPanel from "@/components/SimulatedExecutionPanel";
-import DeployModal from "@/components/DeployModal";
+import PaymentFlow from "@/components/payments/PaymentFlow";
 import Footer from "@/components/Footer";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { applyDifficulty, DIFFICULTY_SCALE, type Difficulty } from "@/lib/estimation/difficulty";
-import { rankOffersByEstimatedCost, type RoutedOffer } from "@/lib/routing/cost-ranking";
+import { rankOffersByEstimatedCost, type RoutedOffer, type RoutingConstraints } from "@/lib/routing/cost-ranking";
 import {
   DEFAULTS,
   parseModelParamsB,
@@ -27,7 +25,7 @@ export default function GetStarted() {
   const [minMemory, setMinMemory] = useState(16);
   const [maxPrice, setMaxPrice] = useState(2);
   const [gpuCount, setGpuCount] = useState(1);
-  const [selectedOffer, setSelectedOffer] = useState<RankedGPUOffer | null>(null);
+  const [rentOffer, setRentOffer] = useState<RoutedOffer | null>(null);
 
   const [profile, setProfile] = useState<WorkloadProfile>(DEFAULTS.inference);
   const [touched, setTouched] = useState<Set<keyof WorkloadProfile>>(new Set());
@@ -40,19 +38,26 @@ export default function GetStarted() {
     [profile, touched, difficulty]
   );
 
-  const result = useMemo(
-    () =>
-      rankOffersByEstimatedCost(offers, effectiveProfile, {
-        minVramGb: minMemory,
-        gpuCount,
-        maxHourlyBudgetUsd: maxPrice,
-        maxTotalBudgetUsd,
-        maxDurationHours: null,
-        cudaRequired: null,
-        optimization,
-      }),
-    [offers, effectiveProfile, minMemory, gpuCount, maxPrice, maxTotalBudgetUsd, optimization]
+  const constraints = useMemo<RoutingConstraints>(
+    () => ({
+      minVramGb: minMemory,
+      gpuCount,
+      maxHourlyBudgetUsd: maxPrice,
+      maxTotalBudgetUsd,
+      maxDurationHours: null,
+      cudaRequired: null,
+      optimization,
+    }),
+    [minMemory, gpuCount, maxPrice, maxTotalBudgetUsd, optimization]
   );
+
+  const result = useMemo(
+    () => rankOffersByEstimatedCost(offers, effectiveProfile, constraints),
+    [offers, effectiveProfile, constraints]
+  );
+
+  // The chosen GPU follows the live ranking, so its price and duration stay current while the panel is open.
+  const renting = rentOffer ? (result.ranked.find((r) => r.offer.id === rentOffer.offer.id) ?? rentOffer) : null;
 
   function updateProfile<K extends keyof WorkloadProfile>(key: K, value: WorkloadProfile[K]) {
     setProfile((p) => ({ ...p, [key]: value }));
@@ -62,10 +67,6 @@ export default function GetStarted() {
   function changeTaskType(type: TaskType) {
     setProfile({ ...DEFAULTS[type] });
     setTouched(new Set());
-  }
-
-  function toDeployable(r: RoutedOffer): RankedGPUOffer {
-    return { ...r.offer, estimatedCost: r.estimatedTotalCostUsd, score: r.routingScore };
   }
 
   function handleReset() {
@@ -110,7 +111,7 @@ export default function GetStarted() {
         <section className="text-center space-y-3">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight font-display">Get Started</h1>
           <p className="text-[#E8D2B5]/80 text-sm sm:text-base leading-relaxed">
-            Describe your task and GPU4U turns it into structured requirements, then finds the best live node for it.
+            Describe your task and GPU4U finds the best live GPU for it. Connect a wallet, pick a GPU to rent, and an x402 agent pays for it under your spending limits.
           </p>
         </section>
 
@@ -149,13 +150,19 @@ export default function GetStarted() {
           result={result}
           loading={loading}
           optimization={optimization}
-          onDeploy={(r) => setSelectedOffer(toDeployable(r))}
+          onRent={setRentOffer}
+          rentingOfferId={rentOffer?.offer.id ?? null}
         />
 
-        <SimulatedExecutionPanel routed={result.selected} />
+        {renting && (
+          <PaymentFlow
+            key={renting.offer.id}
+            routed={renting}
+            request={{ profile, touched: Array.from(touched), difficulty, constraints }}
+          />
+        )}
       </main>
 
-      <DeployModal offer={selectedOffer} onClose={() => setSelectedOffer(null)} />
       <Footer />
     </div>
   );

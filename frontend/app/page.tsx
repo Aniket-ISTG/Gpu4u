@@ -42,7 +42,7 @@ export default function Home() {
           <div className="grid gap-3 sm:grid-cols-3 text-sm text-[#A5A79B]">
             <div className="rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/60 p-4"><span className="block font-display text-[#E8D2B5] mb-1">Describe</span>Write your task in natural language.</div>
             <div className="rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/60 p-4"><span className="block font-display text-[#E8D2B5] mb-1">Match</span>We turn it into structured requirements.</div>
-            <div className="rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/60 p-4"><span className="block font-display text-[#E8D2B5] mb-1">Deploy</span>Pick the best-ranked live node.</div>
+            <div className="rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/60 p-4"><span className="block font-display text-[#E8D2B5] mb-1">Pay</span>An agent pays with x402, and asks you first above your limit.</div>
           </div>
 
           <Link

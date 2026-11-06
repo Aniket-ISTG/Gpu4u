@@ -1,5 +1,9 @@
 "use strict";
 
+// These tests never touch the network. They need an account ID only so a transfer can be built;
+// nothing is signed or sent with it.
+process.env.HEDERA_ACCOUNT_ID = process.env.HEDERA_ACCOUNT_ID || "0.0.1001";
+
 const { describe, it, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -283,8 +287,16 @@ describe("Core Payment Engine Unit Tests (Automated & Mocked)", () => {
         assert.ok(payload.payload.transaction);
 
         // Verify payload structure
-        const verification = await verifyPaymentPayload(payload);
+        const verification = await verifyPaymentPayload(payload, { preflight: async () => ({ ok: true }) });
         assert.equal(verification.valid, true);
+
+        // A failing or unreachable balance check must stop the payment, never wave it through.
+        const refused = await verifyPaymentPayload(payload, { preflight: async () => ({ ok: false, message: "insufficient balance" }) });
+        assert.equal(refused.valid, false);
+        assert.match(refused.error, /insufficient balance/);
+        const unreachable = await verifyPaymentPayload(payload, { preflight: async () => { throw new Error("mirror node down"); } });
+        assert.equal(unreachable.valid, false);
+        assert.match(unreachable.error, /could not be completed/);
         assert.equal(verification.payToAccountId, "0.0.11326195");
         assert.equal(verification.amountTinybars, "250000000");
     });

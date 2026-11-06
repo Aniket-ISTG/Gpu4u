@@ -10,6 +10,11 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
+    "@hashgraph/hedera-wallet-connect": "^2.1.3",
+    "@hiero-ledger/proto": "^2.32.0",
+    "@hiero-ledger/sdk": "^2.79.0",
+    "@walletconnect/modal": "^2.7.0",
+    "@walletconnect/sign-client": "^2.26.0",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
