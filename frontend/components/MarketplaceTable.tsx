@@ -196,9 +196,9 @@ export default function MarketplaceTable({
         </div>
       ) : viewMode === "table" ? (
         /* Table View */
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[640px]">
           <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-[#070F1C]/90 text-[#A5A79B] border-b border-[#A5A79B]/25 uppercase tracking-wider text-[11px] font-display">
+            <thead className="sticky top-0 z-10 bg-[#070F1C] text-[#A5A79B] border-b border-[#A5A79B]/25 uppercase tracking-wider text-[11px] font-display">
               <tr>
                 <th className="p-4 font-bold">GPU Model</th>
                 <th className="p-4 font-bold">Provider</th>

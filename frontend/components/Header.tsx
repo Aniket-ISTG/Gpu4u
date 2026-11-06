@@ -1,20 +1,28 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CpuIcon, SparklesIcon } from "./icons";
 
 interface HeaderProps {
   offersCount: number;
 }
 
+const NAV = [
+  { href: "/", label: "Home" },
+  { href: "/get-started", label: "Get Started" },
+];
+
 export default function Header({ offersCount }: HeaderProps) {
+  const pathname = usePathname();
   return (
     <header className="relative border-b border-[#A5A79B]/25 bg-[#0B1728]/80 backdrop-blur-xl sticky top-0 z-40 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo and Brand */}
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-md bg-[#1E3A5F] border border-[#E8D2B5]/40 text-[#E8D2B5] shadow-[0_0_20px_-3px_rgba(25, 55, 97, 0.8)]">
+          <div className="relative flex items-center justify-center w-9 h-9 rounded-md bg-[#1E3A5F] border border-[#E8D2B5]/40 text-[#E8D2B5] shadow-[0_0_20px_-3px_rgba(25,55,97,0.8)]">
             <CpuIcon className="w-5 h-5 text-[#E8D2B5]" />
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E8D2B5] opacity-75"></span>
@@ -35,6 +43,28 @@ export default function Header({ offersCount }: HeaderProps) {
             </p>
           </div>
         </div>
+
+        {/* Navigation */}
+        <nav className="flex items-center gap-1 font-display text-sm">
+          {NAV.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  item.href === "/get-started"
+                    ? "bg-[#E8D2B5] text-[#0B1728] font-bold hover:bg-[#FAF4EB]"
+                    : active
+                      ? "text-[#E8D2B5] bg-[#1E3A5F]/70"
+                      : "text-[#A5A79B] hover:text-[#FAF4EB]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
 
         {/* Network & Live Status */}
         <div className="flex items-center gap-3 sm:gap-4 font-sans">

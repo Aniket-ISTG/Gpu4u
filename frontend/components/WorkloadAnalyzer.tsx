@@ -66,6 +66,8 @@ interface WorkloadAnalyzerProps {
     maxPrice?: number;
     gpuCount?: number;
     optimization?: "balanced" | "cost" | "performance";
+    model?: string;
+    taskType?: "inference" | "training" | "fine-tuning" | "rendering" | "other";
   }) => void;
 }
 
@@ -150,6 +152,8 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
       maxPrice?: number;
       gpuCount?: number;
       optimization?: "balanced" | "cost" | "performance";
+      model?: string;
+      taskType?: "inference" | "training" | "fine-tuning" | "rendering" | "other";
     } = {};
 
     if (analysis.minimumVramGb !== null && analysis.minimumVramGb > 0) {
@@ -163,6 +167,12 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
     }
     if (analysis.optimization) {
       specs.optimization = analysis.optimization;
+    }
+    if (analysis.model) {
+      specs.model = analysis.model;
+    }
+    if (analysis.taskType) {
+      specs.taskType = analysis.taskType;
     }
 
     if (onApplyRequirements) {
@@ -354,7 +364,7 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs }: 
 
           {/* Validated JSON Inspector */}
           <div className="rounded-md border border-[#A5A79B]/25 bg-[#0B1728]/80 overflow-hidden">
-            <details className="group">
+            <details className="group" open>
               <summary className="cursor-pointer flex items-center justify-between p-3.5 text-xs font-display text-[#E8D2B5] hover:text-[#FAF4EB] transition">
                 <span className="flex items-center gap-2">
                   <span className="text-[#A5A79B]">{'</>'}</span>
