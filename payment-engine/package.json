@@ -1,0 +1,27 @@
+{
+  "name": "x-402-payment",
+  "version": "1.0.0",
+  "description": "Core GPU Router Payment and Human Approval Engine using x402 on Hedera",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test tests/unit_payment_engine.test.js",
+    "test:live": "node tests/testnet_integration.js"
+  },
+  "keywords": [
+    "hedera",
+    "x402",
+    "payments",
+    "gpu-router",
+    "ai-agents"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@hiero-ledger/sdk": "^2.90.1",
+    "@x402/core": "^2.30.0",
+    "@x402/hedera": "^2.30.0",
+    "dotenv": "^18.0.9"
+  }
+}
