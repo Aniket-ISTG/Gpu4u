@@ -10,6 +10,7 @@ import CostRankingTable from "@/components/CostRankingTable";
 import PaymentFlow from "@/components/payments/PaymentFlow";
 import Footer from "@/components/Footer";
 import { useMarketplace } from "@/hooks/useMarketplace";
+import { useAutoMode } from "@/hooks/useAutoMode";
 import { applyDifficulty, DIFFICULTY_SCALE, type Difficulty } from "@/lib/estimation/difficulty";
 import { rankOffersByEstimatedCost, type RoutedOffer, type RoutingConstraints } from "@/lib/routing/cost-ranking";
 import {
@@ -26,6 +27,9 @@ export default function GetStarted() {
   const [maxPrice, setMaxPrice] = useState(2);
   const [gpuCount, setGpuCount] = useState(1);
   const [rentOffer, setRentOffer] = useState<RoutedOffer | null>(null);
+  const [autoMode, setAutoMode] = useAutoMode();
+  // Set when Auto mode has just filled in the specs: the best GPU is chosen as soon as it is ranked.
+  const [autoPick, setAutoPick] = useState(false);
 
   const [profile, setProfile] = useState<WorkloadProfile>(DEFAULTS.inference);
   const [touched, setTouched] = useState<Set<keyof WorkloadProfile>>(new Set());
@@ -57,6 +61,17 @@ export default function GetStarted() {
   );
 
   // The chosen GPU follows the live ranking, so its price and duration stay current while the panel is open.
+  // Auto mode: once the specs are applied and ranked, the top GPU is selected. This adjusts state while
+  // rendering, which React supports for derived state, so there is no extra render with a stale choice.
+  if (autoPick && autoMode) {
+    if (result.selected) {
+      setRentOffer(result.selected);
+      setAutoPick(false);
+    } else if (!loading && offers.length > 0) {
+      setAutoPick(false); // nothing eligible: leave the choice to the user
+    }
+  }
+
   const renting = rentOffer ? (result.ranked.find((r) => r.offer.id === rentOffer.offer.id) ?? rentOffer) : null;
 
   function updateProfile<K extends keyof WorkloadProfile>(key: K, value: WorkloadProfile[K]) {
@@ -83,6 +98,10 @@ export default function GetStarted() {
     model?: string;
     taskType?: TaskType;
   }) {
+    if (autoMode) {
+      setRentOffer(null);
+      setAutoPick(true);
+    }
     if (reqs.minMemory != null) setMinMemory(reqs.minMemory);
     if (reqs.maxPrice != null) setMaxPrice(reqs.maxPrice);
     if (reqs.gpuCount != null) setGpuCount(reqs.gpuCount);
@@ -121,7 +140,28 @@ export default function GetStarted() {
           </div>
         )}
 
-        <WorkloadAnalyzer onApplySpecs={handleApplyRequirements} onDifficulty={setDifficulty} />
+        <label className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/80 p-4">
+          <span className="space-y-0.5">
+            <span className="block font-display text-sm font-bold text-[#FAF4EB]">Auto mode</span>
+            <span className="block text-xs text-[#A5A79B]">
+              {autoMode
+                ? "On: after Analyze Workload, the specs are filled in, the best GPU is chosen, the quote is taken and the payment is prepared automatically. Your wallet still asks you to sign, and payments above your limit still need your approval."
+                : "Off: you fill in the specs, choose a GPU, take the quote and start the payment yourself."}
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoMode}
+            aria-label="Auto mode"
+            onClick={() => setAutoMode(!autoMode)}
+            className={`relative h-7 w-14 shrink-0 rounded-full border transition-colors ${autoMode ? "border-[#E8D2B5] bg-[#E8D2B5]" : "border-[#A5A79B]/40 bg-[#112540]"}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full transition-all ${autoMode ? "left-8 bg-[#0B1728]" : "left-1 bg-[#A5A79B]"}`} />
+          </button>
+        </label>
+
+        <WorkloadAnalyzer onApplySpecs={handleApplyRequirements} onDifficulty={setDifficulty} autoApply={autoMode} />
 
         <WorkloadConfigurator
           minMemory={minMemory}
@@ -157,6 +197,7 @@ export default function GetStarted() {
         {renting && (
           <PaymentFlow
             key={renting.offer.id}
+            auto={autoMode}
             routed={renting}
             request={{ profile, touched: Array.from(touched), difficulty, constraints }}
           />

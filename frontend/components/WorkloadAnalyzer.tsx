@@ -61,6 +61,8 @@ function getSourceBadge(source: string) {
 interface WorkloadAnalyzerProps {
   /** Called with the difficulty in the validated payload (selected or auto-detected). */
   onDifficulty?: (difficulty: Difficulty) => void;
+  /** Auto mode: apply the extracted specs to the router as soon as the analysis finishes. */
+  autoApply?: boolean;
   onApplyRequirements?: (specs: {
     minMemory?: number;
     maxPrice?: number;
@@ -76,7 +78,7 @@ interface WorkloadAnalyzerProps {
   }) => void;
 }
 
-export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs, onDifficulty }: WorkloadAnalyzerProps) {
+export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs, onDifficulty, autoApply = false }: WorkloadAnalyzerProps) {
   const [request, setRequest] = useState("");
   // "" = let the AI auto-detect the difficulty.
   const [difficultyChoice, setDifficultyChoice] = useState<Difficulty | "">("");
@@ -130,6 +132,7 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs, on
 
       setAnalysis(result.analysis);
       onDifficulty?.(result.analysis.difficulty);
+      if (autoApply) applyAnalysis(result.analysis);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -156,8 +159,10 @@ export default function WorkloadAnalyzer({ onApplyRequirements, onApplySpecs, on
   }
 
   function handleApplyToFilters() {
-    if (!analysis) return;
+    if (analysis) applyAnalysis(analysis);
+  }
 
+  function applyAnalysis(analysis: WorkloadAnalysis) {
     const specs: {
       minMemory?: number;
       maxPrice?: number;

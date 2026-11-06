@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RoutedOffer, RoutingConstraints } from "@/lib/routing/cost-ranking";
 import type { Difficulty } from "@/lib/estimation/difficulty";
 import type { WorkloadProfile } from "@/lib/estimation/workload-profile";
@@ -28,6 +28,8 @@ export interface RentRequest {
 
 interface Props {
   routed: RoutedOffer;
+  /** Auto mode: take the quote, start the payment and open the wallet's signature request without clicks. */
+  auto?: boolean;
   request: RentRequest;
 }
 
@@ -57,7 +59,7 @@ const button =
  * In simulated development with an agent payer the old flow still applies: the agent pays and the run is simulated.
  * Mount it with a key of the offer ID so choosing a different GPU starts a fresh flow.
  */
-export default function PaymentFlow({ routed, request }: Props) {
+export default function PaymentFlow({ routed, request, auto = false }: Props) {
   const wallet = useWallet();
   const config = wallet.paymentConfig;
   const walletMode = config?.payer === "wallet";
@@ -200,15 +202,38 @@ export default function PaymentFlow({ routed, request }: Props) {
     setError(null);
   };
 
+  const canPay = Boolean(wallet.account) && (!walletMode || wallet.canSign);
+
+  // Auto mode does each step once. It never signs for the user: the wallet still asks, and a rejection
+  // leaves the manual button in place. A payment that needs the owner's approval still waits for it.
+  const autoDone = useRef({ quote: false, pay: false, sign: false });
+  const sectionRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (auto) sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [auto]);
+  useEffect(() => {
+    if (!auto || busy !== null || wallet.configError) return;
+    const steps = autoDone.current;
+    if (!view && !quote && canPay && !steps.quote) {
+      steps.quote = true;
+      void requestQuote();
+    } else if (!view && quote && !steps.pay && now < quote.expiresAt && quote.policyPreview?.decision !== "refuse") {
+      steps.pay = true;
+      void startPayment();
+    } else if (status === "AWAITING_SIGNATURE" && wallet.canSign && !steps.sign) {
+      steps.sign = true;
+      void signPayment();
+    }
+  });
+
   const quoteExpired = quote ? now >= quote.expiresAt : false;
   const refused = quote?.policyPreview?.decision === "refuse";
   const paid = status === "LEASE_ACTIVE" || status === "RECONCILED";
   const stopped = status !== null && TERMINAL_STATUSES.includes(status) && status !== "RECONCILED";
-  const canPay = Boolean(wallet.account) && (!walletMode || wallet.canSign);
   const serverNow = now + clockOffset;
 
   return (
-    <section className="space-y-4 rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/80 p-6 backdrop-blur-xl shadow-xl font-sans" aria-label="Rent this GPU">
+    <section ref={sectionRef} className="space-y-4 rounded-md border border-[#A5A79B]/25 bg-[#0D1B2E]/80 p-6 backdrop-blur-xl shadow-xl font-sans" aria-label="Rent this GPU">
       <div>
         <h2 className="text-lg font-bold text-[#FAF4EB] font-display">Rent {routed.offer.gpuModel}</h2>
         <p className="text-xs text-[#A5A79B]">
