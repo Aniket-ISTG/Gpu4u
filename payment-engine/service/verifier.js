@@ -1,6 +1,7 @@
 "use strict";
 
 const { normalizeTransactionId } = require("../payment/Settlement_Verifier");
+const { HBAR } = require("./asset");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -92,7 +93,17 @@ class SettlementVerifier {
         };
     }
 
-    async verify({ transactionId, payer, payTo, tinybars, feePayers = [] }) {
+    /**
+     * Confirms a payment on the ledger. `tinybars` is the amount in the asset's smallest unit (tinybars for
+     * HBAR, token base units for a token).
+     *
+     * HBAR: the merchant was credited exactly the amount, the payer lost exactly the amount, and no one else
+     * received value.
+     * Token: the same, counted in that token's transfers. The payer must not have spent any HBAR (the
+     * facilitator pays the fee), no other token may have moved, and no account other than the merchant and the
+     * network's fee collectors may have received HBAR.
+     */
+    async verify({ transactionId, payer, payTo, tinybars, asset = HBAR, feePayers = [] }) {
         const mirrorId = normalizeTransactionId(transactionId);
         const found = await this.waitForRecord(mirrorId);
         if (found.error) return this.fail(mirrorId, found.error);
@@ -102,19 +113,41 @@ class SettlementVerifier {
         if (record.result !== "SUCCESS") problems.push(`Transaction result was ${record.result}`);
 
         const expected = BigInt(tinybars);
+        const unit = asset.unit;
+
+        // Net movement of the quoted asset, per account.
         const net = new Map();
-        for (const t of record.transfers || []) net.set(t.account, (net.get(t.account) ?? 0n) + BigInt(t.amount));
+        const add = (map, account, amount) => map.set(account, (map.get(account) ?? 0n) + BigInt(amount));
+        if (asset.native) {
+            for (const t of record.transfers || []) add(net, t.account, t.amount);
+            for (const t of record.token_transfers || []) problems.push(`Unexpected movement of token ${t.token_id}`);
+        } else {
+            for (const t of record.token_transfers || []) {
+                if (t.token_id === asset.id) add(net, t.account, t.amount);
+                else problems.push(`Unexpected movement of token ${t.token_id}`);
+            }
+        }
 
         const credited = net.get(payTo) ?? 0n;
-        if (credited !== expected) problems.push(`Merchant ${payTo} received ${credited} tinybars, expected exactly ${expected}`);
+        if (credited !== expected) problems.push(`Merchant ${payTo} received ${credited} ${unit}, expected exactly ${expected}`);
 
         const debited = net.get(payer) ?? 0n;
-        if (debited !== -expected) problems.push(`Payer ${payer} net change was ${debited} tinybars, expected exactly ${-expected}`);
+        if (debited !== -expected) problems.push(`Payer ${payer} net change was ${debited} ${unit}, expected exactly ${-expected}`);
 
         // No one else may have received value, apart from system accounts that collect fees.
         for (const [account, amount] of net) {
             if (amount > 0n && account !== payTo && !isSystemAccount(account)) {
-                problems.push(`Unexpected credit of ${amount} tinybars to ${account}`);
+                problems.push(`Unexpected credit of ${amount} ${unit} to ${account}`);
+            }
+        }
+
+        if (!asset.native) {
+            // The facilitator pays the network fee, so the HBAR side of a token payment is only fees.
+            const hbar = new Map();
+            for (const t of record.transfers || []) add(hbar, t.account, t.amount);
+            if ((hbar.get(payer) ?? 0n) < 0n) problems.push(`Payer ${payer} spent HBAR on a token payment`);
+            for (const [account, amount] of hbar) {
+                if (amount > 0n && !isSystemAccount(account)) problems.push(`Unexpected credit of ${amount} tinybars to ${account}`);
             }
         }
 
@@ -132,7 +165,9 @@ class SettlementVerifier {
             consensusTimestamp: record.consensus_timestamp,
             chargedTxFee: record.charged_tx_fee,
             feePayer,
+            asset: asset.id,
             transfers: record.transfers,
+            tokenTransfers: asset.native ? undefined : record.token_transfers,
             problems,
             explorerUrl: this.explorerUrlFor(record, mirrorId),
         };

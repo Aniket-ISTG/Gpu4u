@@ -35,7 +35,7 @@ export function SimulatedBanner({ config }: { config: PaymentConfig | null }) {
   }
   return (
     <p className="rounded-sm border border-emerald-400/30 bg-[#112540]/70 p-3 text-xs text-[#E8D2B5]">
-      <strong>Hedera testnet.</strong> Your wallet signs every payment, and it settles on the real testnet. The HBAR has no market value. Every
+      <strong>Hedera testnet.</strong> Your wallet signs every payment, and it settles on the real testnet. The testnet HBAR and USDC have no market value. Every
       transaction can be checked on HashScan.
     </p>
   );
@@ -168,8 +168,12 @@ export function QuoteCard({ quote, now, children }: { quote: Quote; now: number;
         <Row k="Estimated run" v={`${quote.hours.toFixed(2)} h at ${usd(quote.hourlyUsd)}/h`} />
         <Row k="Estimated cost" v={usd(quote.estimateUsd)} />
         <Row k="You pay up to (cap)" v={usd(quote.capUsd)} strong />
-        <Row k="In HBAR" v={`${quote.hbar} HBAR`} strong />
-        <Row k="Rate" v={`$${quote.rate.usdPerHbar.toFixed(6)} per HBAR (${quote.rate.source === "hedera-mirror-node" ? "Hedera network rate" : "fixed fallback"})`} />
+        <Row k={`In ${quote.assetSymbol}`} v={`${quote.amountDisplay} ${quote.assetSymbol}`} strong />
+        {quote.rate.usdPerHbar != null ? (
+          <Row k="Rate" v={`$${quote.rate.usdPerHbar.toFixed(6)} per HBAR (${quote.rate.source === "hedera-mirror-node" ? "Hedera network rate" : "fixed fallback"})`} />
+        ) : (
+          <Row k="Rate" v={`1 ${quote.assetSymbol} = $1 (no exchange rate)`} />
+        )}
         <Row k="Pay to" v={quote.payTo} mono />
       </dl>
 
@@ -311,14 +315,14 @@ export function SignCard({
         <div>
           <p className={label}>Sign the payment in your wallet</p>
           <p className="text-sm text-[#FAF4EB]">
-            Your wallet will show a transfer of <strong>{quote.hbar} HBAR</strong> from your account <span className="font-mono">{quote.wallet}</span> to the
+            Your wallet will show a transfer of <strong>{quote.amountDisplay} {quote.assetSymbol}</strong> from your account <span className="font-mono">{quote.wallet}</span> to the
             merchant <span className="font-mono">{quote.payTo}</span>.
           </p>
         </div>
         <span className="rounded-sm bg-[#1E3A5F] px-2 py-1 font-mono text-xs text-[#E8D2B5]">{left > 0 ? formatCountdown(left) : "expired"}</span>
       </div>
       <ul className="list-disc space-y-1 pl-5 text-xs text-[#A5A79B]">
-        <li>This is the exact payment you were quoted: up to {usd(quote.capUsd)}, in HBAR, to one account. It cannot be changed.</li>
+        <li>This is the exact payment you were quoted: up to {usd(quote.capUsd)}, in {quote.assetSymbol}, to one account. It cannot be changed.</li>
         <li>
           The network fee is paid by the facilitator{feePayer ? <> (<span className="font-mono">{feePayer}</span>)</> : null}, not by you.
         </li>
@@ -346,7 +350,7 @@ export function ReceiptCard({ view, config }: { view: PaymentView; config: Payme
         </span>
       </div>
       <dl className="space-y-1 text-xs">
-        <Row k="Paid" v={`${quote.hbar} HBAR (up to ${usd(quote.capUsd)})`} strong />
+        <Row k="Paid" v={`${quote.amountDisplay} ${quote.assetSymbol} (up to ${usd(quote.capUsd)})`} strong />
         <Row k="Paid to" v={quote.payTo} mono />
         <Row k="Paid by" v={payment.settlement?.payer ?? config?.accounts.agent ?? "wallet"} mono />
         <Row k="Network fee paid by" v={payment.settlement?.feePayer ?? "the facilitator"} mono />
@@ -368,7 +372,7 @@ export function LeaseMeterCard({ view, serverNow, busy, onEnd }: { view: Payment
   if (!lease) return null;
   const { quote } = view;
   const meter = meterLeaseTime({ hourlyUsd: quote.hourlyUsd, capUsd: quote.capUsd, startedAtMs: lease.createdAt, nowMs: serverNow });
-  const hbarPerUsd = Number(quote.hbar) / quote.capUsd;
+  const unitsPerUsd = Number(quote.amountDisplay) / quote.capUsd;
   return (
     <div className={card + " space-y-3 border-emerald-400/30"}>
       <div className="flex items-center justify-between gap-2">
@@ -380,7 +384,7 @@ export function LeaseMeterCard({ view, serverNow, busy, onEnd }: { view: Payment
       </p>
       <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
         <Row k="Lease held for" v={formatDuration(meter.elapsedSeconds)} strong />
-        <Row k="Cost so far" v={`${usd(meter.usd)} · ${(meter.usd * hbarPerUsd).toFixed(4)} HBAR`} strong />
+        <Row k="Cost so far" v={`${usd(meter.usd)} · ${(meter.usd * unitsPerUsd).toFixed(4)} ${quote.assetSymbol}`} strong />
         <Row k="Price" v={`${usd(quote.hourlyUsd)} per hour, billed by the second`} />
         <Row k="Reaches the cap in" v={meter.stoppedAtCap ? "now" : formatDuration(meter.capSeconds - meter.elapsedSeconds)} />
       </dl>
@@ -415,7 +419,7 @@ export function ReconciliationCard({ view }: { view: PaymentView }) {
       </p>
       <dl className="space-y-1 text-xs">
         <Row k={leaseTime ? "Held for" : "Used (simulated)"} v={formatDuration(rec.actualDurationHours * 3600)} strong />
-        <Row k="Paid (final)" v={`${rec.paidHbar} HBAR`} strong />
+        <Row k="Paid (final)" v={`${rec.paidDisplay} ${rec.asset.symbol}`} strong />
         <Row k="Refund" v="None. Payments are final." />
       </dl>
       <p className="text-[11px] text-[#A5A79B]">{rec.billingNote}</p>
@@ -446,7 +450,7 @@ export function FinalReceiptCard({ receipt }: { receipt: Receipt }) {
       <dl className="space-y-1 text-xs">
         <Row k="GPU" v={`${receipt.offer.gpuModel} ×${receipt.offer.gpuCount} · ${receipt.offer.provider}`} />
         <Row k="Paid by" v={receipt.payer.wallet} mono />
-        <Row k="Paid" v={`${receipt.quote.paidHbar} HBAR`} />
+        <Row k="Paid" v={`${receipt.quote.paidDisplay} ${receipt.quote.asset.symbol}`} />
         {receipt.lease && <Row k="Lease held" v={`${receipt.lease.billedSeconds ?? "?"} s`} />}
         <Row k="Refund" v="None. Payments are final." />
         <Row k="Audit" v={`${receipt.audit.events} events · chain ${receipt.audit.chainIntact ? "intact" : "BROKEN"}`} />

@@ -11,6 +11,7 @@ const {
 } = require("@x402/hedera");
 const { ExactHederaScheme } = require("@x402/hedera/exact/facilitator");
 const { parsePrivateKey } = require("./keys");
+const { HBAR_ASSET_ID } = require("./asset");
 
 const NETWORK = "hedera:testnet";
 
@@ -29,10 +30,15 @@ function createSimulatedFacilitatorSigner({ ledger, feePayerId }) {
             const tx = Transaction.fromBytes(Buffer.from(transaction, "base64"));
             return key.verifyTransaction(tx) ? { ok: true } : { ok: false, reason: "bad_signature", message: "Payer signature is invalid" };
         },
-        preflightTransfer: async ({ payer, amount }) => {
-            return ledger.balanceOf(payer) >= BigInt(amount)
+        preflightTransfer: async ({ payer, payTo, asset, amount }) => {
+            if (asset && asset !== HBAR_ASSET_ID) {
+                // A token can only move between accounts that are associated with it, as on Hedera.
+                if (!ledger.isAssociated(payer, asset)) return { ok: false, reason: "payer_not_associated", message: `Payer ${payer} is not associated with token ${asset}` };
+                if (!ledger.isAssociated(payTo, asset)) return { ok: false, reason: "receiver_not_associated", message: `Receiver ${payTo} is not associated with token ${asset}` };
+            }
+            return ledger.balanceOf(payer, asset || HBAR_ASSET_ID) >= BigInt(amount)
                 ? { ok: true }
-                : { ok: false, reason: "insufficient_balance", message: `Payer ${payer} cannot cover ${amount} tinybars` };
+                : { ok: false, reason: "insufficient_balance", message: `Payer ${payer} cannot cover ${amount} of ${asset || HBAR_ASSET_ID}` };
         },
         signAndSubmitTransaction: async (transactionBase64) => {
             const tx = TransferTransaction.fromBytes(Buffer.from(transactionBase64, "base64"));
@@ -40,9 +46,16 @@ function createSimulatedFacilitatorSigner({ ledger, feePayerId }) {
             for (const [account, hbar] of tx.hbarTransfers) {
                 transfers.push({ account: account.toString(), amount: BigInt(hbar.toTinybars().toString()) });
             }
+            const tokenTransfers = [];
+            for (const [token, accounts] of tx.tokenTransfers) {
+                for (const [account, amount] of accounts) {
+                    tokenTransfers.push({ token: token.toString(), account: account.toString(), amount: BigInt(amount.toString()) });
+                }
+            }
             const result = ledger.submit({
                 transactionId: tx.transactionId.toString(),
                 transfers,
+                tokenTransfers,
                 feePayer: feePayerId,
                 memo: tx.transactionMemo || "",
             });

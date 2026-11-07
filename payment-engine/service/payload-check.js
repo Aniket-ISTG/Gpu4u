@@ -1,6 +1,7 @@
 "use strict";
 
 const { inspectHederaTransaction } = require("@x402/hedera");
+const { HBAR } = require("./asset");
 
 const MAX_TRANSACTION_BASE64_LENGTH = 20_000;
 
@@ -27,6 +28,8 @@ function checkWalletPayload({ payload, required, quote, knownFeePayers }) {
     if ((accepted.extra && accepted.extra.feePayer) !== (wanted.extra && wanted.extra.feePayer)) {
         problems.push("The signed terms name a different fee payer than the server's");
     }
+    const asset = quote.asset || HBAR;
+    if (accepted.asset !== asset.id) problems.push(`The signed asset is not the quoted ${asset.symbol}`);
     if (String(accepted.amount) !== String(quote.tinybars)) problems.push("The signed amount is not the quoted amount");
     if (accepted.payTo !== quote.payTo) problems.push("The signed recipient is not the quote's merchant");
 
@@ -49,18 +52,27 @@ function checkWalletPayload({ payload, required, quote, knownFeePayers }) {
     if (!knownFeePayers.includes(inspected.transactionIdAccountId)) {
         problems.push(`The transaction's fee payer ${inspected.transactionIdAccountId} is not this service's facilitator`);
     }
-    if (Object.keys(inspected.tokenTransfers || {}).length > 0) problems.push("The transaction moves tokens, which is not allowed");
 
-    // Exactly two HBAR transfers: the wallet pays the amount, the merchant receives it.
-    const transfers = inspected.hbarTransfers || [];
-    const byAccount = new Map(transfers.map((t) => [t.accountId, BigInt(t.amount)]));
+    // Exactly two transfers of the quoted asset: the wallet pays the amount, the merchant receives it. The
+    // fee is paid by the facilitator through the transaction ID, so nothing else may move.
     const expected = BigInt(quote.tinybars);
+    let transfers;
+    if (asset.native) {
+        if (Object.keys(inspected.tokenTransfers || {}).length > 0) problems.push("The transaction moves tokens, which is not allowed");
+        transfers = inspected.hbarTransfers || [];
+    } else {
+        if ((inspected.hbarTransfers || []).length > 0) problems.push("The transaction moves HBAR, which is not allowed for a token payment");
+        const tokens = Object.keys(inspected.tokenTransfers || {});
+        if (tokens.length !== 1 || tokens[0] !== asset.id) problems.push(`The transaction must move only ${asset.symbol} (${asset.id})`);
+        transfers = (inspected.tokenTransfers || {})[asset.id] || [];
+    }
+    const byAccount = new Map(transfers.map((t) => [t.accountId, BigInt(t.amount)]));
     if (transfers.length !== 2 || byAccount.size !== 2) problems.push("The transfer must have exactly two parties");
     if (byAccount.get(quote.wallet) !== -expected) {
-        problems.push(`The transfer must take exactly ${expected} tinybars from your wallet ${quote.wallet}`);
+        problems.push(`The transfer must take exactly ${expected} ${asset.unit} from your wallet ${quote.wallet}`);
     }
     if (byAccount.get(quote.payTo) !== expected) {
-        problems.push(`The transfer must give exactly ${expected} tinybars to the merchant ${quote.payTo}`);
+        problems.push(`The transfer must give exactly ${expected} ${asset.unit} to the merchant ${quote.payTo}`);
     }
 
     return { problems, transactionId: inspected.transactionId || null };

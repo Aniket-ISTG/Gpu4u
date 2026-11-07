@@ -2,7 +2,7 @@
 
 const crypto = require("node:crypto");
 const { PaymentStatus } = require("./states");
-const { tinybarsToHbarString } = require("./rate");
+const { formatAmount } = require("./asset");
 const { meterLease } = require("./metering");
 
 class LeaseError extends Error {
@@ -107,8 +107,12 @@ class LeaseService {
         const reconciliation = {
             paidTinybars: paid.toString(),
             billedTinybars: billed.toString(),
-            paidHbar: tinybarsToHbarString(paid),
-            billedHbar: tinybarsToHbarString(billed),
+            asset: quote.asset,
+            paidDisplay: formatAmount(paid, quote.asset),
+            billedDisplay: formatAmount(billed, quote.asset),
+            // Kept for HBAR clients. Null when the payment was not in HBAR.
+            paidHbar: quote.asset.native ? formatAmount(paid, quote.asset) : null,
+            billedHbar: quote.asset.native ? formatAmount(billed, quote.asset) : null,
             capUsd: quote.capUsd,
             estimateUsd: quote.estimateUsd,
             actualUsd,

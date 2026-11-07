@@ -49,7 +49,7 @@ export function deriveSteps(view: PaymentView): Step[] {
     steps.push({ key, label, state, detail });
   };
 
-  push("quote", "Quote locked", true, `${quote.hbar} HBAR for up to $${quote.capUsd.toFixed(2)}`);
+  push("quote", "Quote locked", true, `${quote.amountDisplay} ${quote.assetSymbol} for up to $${quote.capUsd.toFixed(2)}`);
 
   push(
     "policy",

@@ -46,10 +46,10 @@ const HBAR = 100_000_000n;
  * Starts the service in wallet mode: the user's wallet pays, and nothing is signed by the server.
  * The user's account exists on the simulated ledger with a key and a balance, like a funded testnet account.
  */
-async function startWalletService({ env = {}, overrides = {}, balanceHbar = 1000n, account = WALLET } = {}) {
+async function startWalletService({ env = {}, overrides = {}, balanceHbar = 1000n, account = WALLET, tokens = {} } = {}) {
     const userKey = PrivateKey.generateECDSA();
     const ledger = overrides.ledger || new SimLedger();
-    ledger.addAccount(account, { key: userKey.publicKey, balance: balanceHbar * HBAR });
+    ledger.addAccount(account, { key: userKey.publicKey, balance: balanceHbar * HBAR, tokens });
     const svc = await startTestService({ env: { PAYER_MODE: "wallet", ...env }, overrides: { ...overrides, ledger } });
 
     return Object.assign(svc, {

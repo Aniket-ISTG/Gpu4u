@@ -14,6 +14,8 @@ const MODES = ["simulated", "testnet"];
 const APPROVAL_MODES = ["click", "wallet"];
 const FACILITATOR_MODES = ["local", "external"];
 const PAYER_MODES = ["agent", "wallet"];
+const ASSETS = ["hbar", "usdc"];
+const { HBAR, tokenAsset, TESTNET_USDC_ID } = require("./asset");
 
 const BLOCKY402_TESTNET = "https://api.testnet.blocky402.com";
 
@@ -54,6 +56,14 @@ function assertTestnetOnly(env) {
     }
 }
 
+/** HBAR by default. PAYMENT_ASSET=usdc settles in the HTS token USDC_TOKEN_ID (Circle's testnet USDC by default). */
+function paymentAsset(env) {
+    const choice = oneOf(env, "PAYMENT_ASSET", ASSETS, "hbar");
+    if (choice === "hbar") return HBAR;
+    const id = accountId(env, "USDC_TOKEN_ID", TESTNET_USDC_ID);
+    return tokenAsset({ id });
+}
+
 /**
  * @param {NodeJS.ProcessEnv} [env]
  */
@@ -76,6 +86,10 @@ function loadConfig(env = process.env) {
         serviceToken: env.SERVICE_TOKEN || null,
 
         payer: { mode: payerMode },
+
+        // What a payment is made in. HBAR is converted from USD at the network rate. USDC is an HTS token worth
+        // exactly $1, so it needs no rate: the quote is the cap in dollars, to the cent.
+        asset: paymentAsset(env),
 
         // Spending policy, all in USD so limits do not drift with the HBAR price.
         policy: {
@@ -117,6 +131,7 @@ function loadConfig(env = process.env) {
         simulation: {
             fallbackUsdPerHbar: num(env, "SIM_USD_PER_HBAR", 0.068, { min: 0.000001 }),
             startingBalanceHbar: num(env, "SIM_STARTING_BALANCE_HBAR", 1000, { min: 1 }),
+            startingBalanceToken: num(env, "SIM_STARTING_BALANCE_USDC", 1000, { min: 1 }),
         },
 
         // Refunds smaller than this are not worth a transaction.

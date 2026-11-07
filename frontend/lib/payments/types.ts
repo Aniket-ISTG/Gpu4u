@@ -71,10 +71,18 @@ export interface Quote {
   hourlyUsd: number;
   estimateUsd: number;
   capUsd: number;
+  /** The amount in the asset's smallest unit: tinybars for HBAR, token base units for a token. */
   tinybars: string;
-  hbar: string;
+  /** What the quote is paid in. HBAR, or an HTS token such as USDC. */
+  asset: { id: string; symbol: string; decimals: number; native: boolean; unit: string };
+  /** The amount in the asset's own units, ready to show, such as "0.42". */
+  amountDisplay: string;
+  assetSymbol: string;
+  /** The amount in HBAR. Null when the quote is not in HBAR. */
+  hbar: string | null;
   rate: {
-    usdPerHbar: number;
+    /** Null when the quote is in a $1 token, which needs no exchange rate. */
+    usdPerHbar: number | null;
     source: string;
     validUntil: number;
   };
@@ -137,8 +145,11 @@ export interface Payment {
 export interface Reconciliation {
   paidTinybars: string;
   billedTinybars: string;
-  paidHbar: string;
-  billedHbar: string;
+  paidHbar: string | null;
+  billedHbar: string | null;
+  paidDisplay: string;
+  billedDisplay: string;
+  asset: Quote["asset"];
   capUsd: number;
   estimateUsd: number;
   actualUsd: number;
@@ -227,7 +238,7 @@ export interface PaymentRequirementsResponse {
       extra?: { feePayer?: string };
     }[];
   };
-  expected: { payTo: string; tinybars: string };
+  expected: { payTo: string; tinybars: string; asset: string };
   wallet: string;
   memo: string;
   expiresAt: number;
@@ -245,7 +256,7 @@ export interface Receipt {
   payer: { wallet: string; mode: "wallet" | "agent" };
   merchant: string;
   offer: Quote["offer"];
-  quote: { id: string; estimateUsd: number; capUsd: number; hourlyUsd: number; paidTinybars: string; paidHbar: string };
+  quote: { id: string; estimateUsd: number; capUsd: number; hourlyUsd: number; paidTinybars: string; paidHbar: string | null; paidDisplay: string; asset: Quote["asset"] };
   payment: {
     transactionId: string | null;
     consensusTimestamp: string | null;
@@ -260,6 +271,7 @@ export interface Receipt {
     billingBasis: "lease-time" | "simulated" | null;
     billingNote: string | null;
     billedHbar: string | null;
+    billedDisplay: string | null;
     billedUsd: number | null;
     billedSeconds: number | null;
     runStatus: "completed" | "stopped_at_cap" | null;

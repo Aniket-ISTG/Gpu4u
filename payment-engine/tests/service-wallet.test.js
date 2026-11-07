@@ -71,7 +71,7 @@ describe("wallet mode: a small payment", () => {
         assert.equal(terms.amount, quote.tinybars);
         assert.equal(terms.payTo, svc.services.accounts.merchant);
         assert.equal(terms.extra.feePayer, svc.services.accounts.feePayer);
-        assert.deepEqual(r.expected, { payTo: quote.payTo, tinybars: quote.tinybars });
+        assert.deepEqual(r.expected, { payTo: quote.payTo, tinybars: quote.tinybars, asset: "0.0.0" });
         assert.equal(r.wallet, WALLET);
     });
 
@@ -207,15 +207,17 @@ describe("wallet mode: the server accepts only the exact payment that was quoted
     });
 });
 
-describe("wallet mode: the lease endpoint is not open to the public", () => {
-    it("answers 403 to anyone but the service's own relay", async () => {
+describe("wallet mode: only the service's relay may pay at the lease endpoint", () => {
+    it("shows the price to anyone, but answers 403 to a payment that did not come through the relay", async () => {
         const svc = await start();
         const { quote } = await begin(svc);
         const post = (headers = {}) => fetch(svc.baseUrl + "/v1/leases", {
             method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ quoteId: quote.id }),
         });
-        assert.equal((await post()).status, 403);
-        assert.equal((await post({ "x-gpu4u-relay": "wrong-secret" })).status, 403);
+        const paid = { "PAYMENT-SIGNATURE": Buffer.from("{}").toString("base64") };
+        assert.equal((await post()).status, 402, "anyone may ask the price; it moves no money");
+        assert.equal((await post(paid)).status, 403, "a payment straight to the endpoint is refused");
+        assert.equal((await post({ ...paid, "x-gpu4u-relay": "wrong-secret" })).status, 403);
         assert.equal((await post({ "x-gpu4u-relay": svc.services.relaySecret })).status, 402, "the relay gets the payment terms");
     });
 });

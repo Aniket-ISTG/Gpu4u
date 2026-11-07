@@ -1,4 +1,4 @@
-import { AccountId, Hbar, Transaction, TransactionId, TransferTransaction } from "@hiero-ledger/sdk";
+import { AccountId, Hbar, TokenId, Transaction, TransactionId, TransferTransaction } from "@hiero-ledger/sdk";
 import { proto } from "@hiero-ledger/proto";
 
 /**
@@ -56,7 +56,10 @@ export interface PaymentPayload {
 /** What the user was shown and agreed to. The wallet is only asked to sign terms that match it. */
 export interface ExpectedTerms {
   payTo: string;
+  /** The amount in the asset's smallest unit: tinybars for HBAR, token base units for a token. */
   tinybars: string;
+  /** The asset the user was quoted in. Omitted means native HBAR. */
+  asset?: string;
 }
 
 export class PaymentBuildError extends Error {
@@ -70,6 +73,7 @@ export class PaymentBuildError extends Error {
 }
 
 const ACCOUNT = /^0\.0\.\d{1,12}$/;
+const ASSET_ID = /^0\.0\.\d{1,12}$/;
 
 /**
  * Picks the one payment option this app can sign, and refuses anything that differs from what the
@@ -82,10 +86,12 @@ export function selectTerms(required: PaymentRequired, expected: ExpectedTerms):
   if (!terms) throw new PaymentBuildError("NO_TERMS", "The server offered no payment option on Hedera testnet.");
 
   const problems: string[] = [];
-  if (terms.asset !== HBAR_ASSET) problems.push(`asset ${terms.asset} is not native HBAR`);
+  const asset = expected.asset ?? HBAR_ASSET;
+  if (!ASSET_ID.test(asset)) problems.push(`the quoted asset ${asset} is not a valid asset`);
+  if (terms.asset !== asset) problems.push(asset === HBAR_ASSET ? `asset ${terms.asset} is not native HBAR` : `asset ${terms.asset} is not the quoted token ${asset}`);
   if (terms.payTo !== expected.payTo) problems.push(`it pays ${terms.payTo}, not the merchant ${expected.payTo}`);
   if (String(terms.amount) !== String(expected.tinybars)) {
-    problems.push(`it asks for ${terms.amount} tinybars, not the quoted ${expected.tinybars}`);
+    problems.push(`it asks for ${terms.amount} units, not the quoted ${expected.tinybars}`);
   }
   const feePayer = terms.extra?.feePayer;
   if (typeof feePayer !== "string" || !ACCOUNT.test(feePayer)) problems.push("it names no valid fee payer");
@@ -144,9 +150,19 @@ export function buildPaymentTransaction(options: {
   if (amount <= BigInt(0)) throw new PaymentBuildError("TERMS_MISMATCH", "The payment amount must be above zero.");
 
   const nodeAccountId = options.nodeAccountId ?? pickNode(options.random ?? Math.random);
-  const tx = new TransferTransaction()
-    .addHbarTransfer(AccountId.fromString(payerAccountId), Hbar.fromTinybars((-amount).toString()))
-    .addHbarTransfer(AccountId.fromString(terms.payTo), Hbar.fromTinybars(amount.toString()))
+  const tx = new TransferTransaction();
+  if (terms.asset === HBAR_ASSET) {
+    tx.addHbarTransfer(AccountId.fromString(payerAccountId), Hbar.fromTinybars((-amount).toString()));
+    tx.addHbarTransfer(AccountId.fromString(terms.payTo), Hbar.fromTinybars(amount.toString()));
+  } else {
+    // An HTS token: the same two-party transfer, in the token's base unit. Both accounts must be
+    // associated with the token. The fee is still paid by the facilitator, in HBAR.
+    if (!ASSET_ID.test(terms.asset)) throw new PaymentBuildError("TERMS_MISMATCH", "The payment asset is not a valid token.");
+    const token = TokenId.fromString(terms.asset);
+    tx.addTokenTransfer(token, AccountId.fromString(payerAccountId), -amount);
+    tx.addTokenTransfer(token, AccountId.fromString(terms.payTo), amount);
+  }
+  tx
     .setTransactionId(TransactionId.generate(AccountId.fromString(feePayer)))
     .setNodeAccountIds([AccountId.fromString(nodeAccountId)])
     .setTransactionValidDuration(MAX_VALID_DURATION_SECONDS);

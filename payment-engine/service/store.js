@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const { PaymentStatus, COMMITTED } = require("./states");
+const { assetFromStored, storableAsset } = require("./asset");
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS quotes (
@@ -20,7 +21,8 @@ CREATE TABLE IF NOT EXISTS quotes (
     tinybars TEXT NOT NULL,
     rate_json TEXT NOT NULL,
     terms_hash TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'OPEN'
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    asset_json TEXT
 );
 CREATE TABLE IF NOT EXISTS payments (
     id TEXT PRIMARY KEY,
@@ -99,6 +101,8 @@ function quoteFromRow(row) {
         estimateUsd: row.estimate_usd,
         capUsd: row.cap_usd,
         tinybars: row.tinybars,
+        // The asset the amount is in. Quotes made before tokens existed have none, and are HBAR.
+        asset: assetFromStored(parse(row.asset_json)),
         rate: parse(row.rate_json),
         termsHash: row.terms_hash,
         status: row.status,
@@ -185,6 +189,13 @@ class Store {
         this.db = new DatabaseSync(dbPath);
         this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
         this.db.exec(SCHEMA);
+        this.migrate();
+    }
+
+    /** Adds columns that older database files lack. Safe to run on every start. */
+    migrate() {
+        const quoteColumns = this.db.prepare("PRAGMA table_info(quotes)").all().map((c) => c.name);
+        if (!quoteColumns.includes("asset_json")) this.db.exec("ALTER TABLE quotes ADD COLUMN asset_json TEXT");
     }
 
     close() {
@@ -209,11 +220,11 @@ class Store {
         this.db
             .prepare(
                 `INSERT INTO quotes (id, created_at, expires_at, wallet, pay_to, offer_json, hours, hourly_usd,
-                    estimate_usd, cap_usd, tinybars, rate_json, terms_hash, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')`,
+                    estimate_usd, cap_usd, tinybars, rate_json, terms_hash, status, asset_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?)`,
             )
             .run(q.id, q.createdAt, q.expiresAt, q.wallet, q.payTo, json(q.offer), q.hours, q.hourlyUsd,
-                q.estimateUsd, q.capUsd, String(q.tinybars), json(q.rate), q.termsHash);
+                q.estimateUsd, q.capUsd, String(q.tinybars), json(q.rate), q.termsHash, json(q.asset ? storableAsset(q.asset) : null));
         return this.getQuote(q.id);
     }
 

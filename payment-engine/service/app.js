@@ -6,7 +6,7 @@ const { ZodError } = require("zod");
 const { paymentMiddleware } = require("@x402/express");
 const { x402ResourceServer, HTTPFacilitatorClient } = require("@x402/core/server");
 const { ExactHederaScheme } = require("@x402/hedera/exact/server");
-const { HBAR_ASSET_ID } = require("@x402/hedera");
+const { HBAR } = require("./asset");
 const { PaymentStatus } = require("./states");
 const { createFacilitatorRouter } = require("./facilitator");
 const { NETWORK } = require("./agent");
@@ -53,6 +53,45 @@ function createApp(services) {
         });
     });
 
+    // x402 discovery: how an agent finds the paid endpoint, what it costs and where it settles. Public, no secrets.
+    app.get(["/.well-known/x402", "/.well-known/x402.json"], (req, res) => {
+        const base = state.baseUrl || `${req.protocol}://${req.get("host")}`;
+        const asset = config.asset;
+        res.json({
+            x402Version: 2,
+            name: "GPU4U GPU lease",
+            description: "Rent a live GPU from the Aquanode marketplace. The price is set per quote, so each lease has its own 402 challenge.",
+            network: NETWORK,
+            mode: config.mode,
+            simulated: config.simulated,
+            facilitator: { mode: config.facilitator.mode, url: config.facilitator.mode === "local" ? base + "/facilitator" : config.facilitator.url, feePayer: services.accounts.feePayer },
+            resources: [
+                {
+                    resource: base + "/v1/leases",
+                    method: "POST",
+                    scheme: "exact",
+                    network: NETWORK,
+                    asset: { id: asset.id, symbol: asset.symbol, decimals: asset.decimals },
+                    payTo: services.accounts.merchant,
+                    pricing: "dynamic",
+                    pricingNote: "The amount is fixed by a server-side quote (the USD cap converted to the asset). An unpaid POST with a quoteId returns 402 with the exact price in the PAYMENT-REQUIRED header.",
+                    input: { quoteId: "string (from POST /v1/quotes)", paymentId: "string" },
+                    payment: "Sign a TransferTransaction with the facilitator as fee payer, then send it in the PAYMENT-SIGNATURE header.",
+                },
+            ],
+            quoting: { create: base + "/v1/quotes", note: "Requires the service token. Use the web app API: POST /api/quotes." },
+            spendingControls: {
+                autoApproveLimitUsd: config.policy.autoApproveLimitUsd,
+                dailyLimitUsd: config.policy.dailyLimitUsd,
+                hardCeilingUsd: config.policy.hardCeilingUsd,
+                globalDailyLimitUsd: config.policy.globalDailyLimitUsd,
+                humanApprovalAbove: "autoApproveLimitUsd",
+                recipientAllowlist: [services.accounts.merchant],
+            },
+            audit: { hcsTopicId: publisher ? publisher.topicId : config.hedera.hcsTopicId, explorer: config.simulated ? null : "https://hashscan.io/testnet" },
+        });
+    });
+
     app.get("/v1/config", (_req, res) => {
         res.json({
             mode: config.mode,
@@ -60,6 +99,8 @@ function createApp(services) {
             // "wallet": the user's wallet signs every payment. "agent": a server key pays (simulated development only).
             payer: config.payer.mode,
             network: NETWORK,
+            // What payments are made in: HBAR, or an HTS token such as USDC.
+            asset: { id: config.asset.id, symbol: config.asset.symbol, decimals: config.asset.decimals, native: config.asset.native },
             accounts: services.accounts,
             facilitator: { mode: config.facilitator.mode, feePayer: services.accounts.feePayer },
             limits: config.policy,
@@ -191,7 +232,10 @@ function attachLeaseApi(app, services, baseUrl) {
         ? [PaymentStatus.AWAITING_SIGNATURE, PaymentStatus.SIGNING]
         : [PaymentStatus.AWAITING_402, PaymentStatus.SIGNING];
     slot.post("/v1/leases", (req, res, next) => {
-        if (walletMode && !sameSecret(req.get(RELAY_HEADER), services.relaySecret)) {
+        // Anyone may ask the price: an unpaid request is answered with 402 and moves no money. Only a request that
+        // carries a payment must come through the relay, so a signed payment passes the checks in payments.js.
+        const carriesPayment = Boolean(req.get("PAYMENT-SIGNATURE") || req.get("X-PAYMENT"));
+        if (walletMode && carriesPayment && !sameSecret(req.get(RELAY_HEADER), services.relaySecret)) {
             return res.status(403).json({ error: "FORBIDDEN", message: "Payments are relayed by the payment service only" });
         }
         const quoteId = req.body && req.body.quoteId;
@@ -215,7 +259,7 @@ function attachLeaseApi(app, services, baseUrl) {
                 price: async (context) => {
                     const body = context.adapter.getBody ? context.adapter.getBody() : null;
                     const quote = store.getQuote(body && body.quoteId);
-                    return { asset: HBAR_ASSET_ID, amount: String(quote.tinybars) };
+                    return { asset: (quote.asset || HBAR).id, amount: String(quote.tinybars) };
                 },
                 maxTimeoutSeconds: 180,
             },

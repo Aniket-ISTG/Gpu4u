@@ -8,7 +8,10 @@
     "cli": "node index.js",
     "test": "node --test --test-timeout=60000 \"tests/*.test.js\"",
     "test:live": "node tests/testnet_integration.js",
-    "live:check": "node scripts/live-check.js"
+    "live:check": "node scripts/live-check.js",
+    "associate": "node scripts/associate-token.js",
+    "agent": "node agent/gpu-agent.js",
+    "agent:create": "node scripts/create-agent-account.js"
   },
   "keywords": [
     "hedera",

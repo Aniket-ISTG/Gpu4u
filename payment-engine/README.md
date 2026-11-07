@@ -39,6 +39,26 @@ In testnet the **user's connected wallet signs every payment**; the service neve
 3. `npm run live:check` runs one payment with a stand-in payer key (not HashPack).
 4. Follow [../docs/testnet-manual-test.md](../docs/testnet-manual-test.md) for the real wallet test.
 
+## Paying in HBAR or USDC
+
+`PAYMENT_ASSET` chooses what a payment is made in. HBAR is the default.
+
+| | `hbar` (default) | `usdc` |
+| --- | --- | --- |
+| Asset | Native HBAR (`0.0.0`) | HTS token `USDC_TOKEN_ID` (Circle testnet USDC `0.0.429274`, 6 decimals) |
+| Amount | USD cap converted at the Hedera network rate, rounded up to a tinybar | The USD cap in token units. The token is worth $1, so there is no rate |
+| Ledger check | Reads HBAR `transfers` | Reads `token_transfers` for that token. The payer must not have spent HBAR, and no other token or account may have been paid |
+| User's wallet needs | HBAR | The token, associated with the account. No HBAR for the payment itself |
+| Network fee | Paid by the facilitator fee payer, in HBAR | The same |
+
+For USDC to work on testnet:
+
+1. **Associate the token** with the receiver (`HEDERA_RECEIVER_ID`) and with the paying wallet. The service refuses to start if the receiver cannot receive it, and refuses a quote if the wallet is not associated or holds too little. For the receiver: `ASSOCIATE_ACCOUNT_ID=0.0.x ASSOCIATE_ACCOUNT_KEY=... npm run associate`. HashPack associates inside the wallet.
+2. **Fund the wallet** with test USDC from https://faucet.circle.com (choose Hedera Testnet).
+3. Set `PAYMENT_ASSET=usdc`. Startup checks that the token exists, is a fungible token, is not paused, and has 6 decimals, because the amounts would be wrong otherwise.
+
+The amount field keeps its historical name `tinybars` in the API and database. For a token it holds token units. Every quote carries its `asset`, so an amount is never read in the wrong unit, and a quote made before tokens existed is read as HBAR. The agent and the wallet both refuse terms in an asset other than the one that was quoted and approved.
+
 ## How a payment works
 
 ```text
@@ -114,13 +134,15 @@ Everything except health, config, the lease endpoint and the facilitator needs `
 ## Tests
 
 ```bash
-npm test          # 100 tests, no network, about 7 seconds
+npm test          # 226 tests, no network, about 10 seconds
 npm run live:check # one real payment on testnet (needs credentials)
 ```
 
 The suite covers the conversion math, policy, quotes, approvals in both modes, the audit chain, the Hedera publisher (with the network call stubbed), the verifier, the simulated ledger, and the whole service end to end over HTTP: automatic payment, approval, rejection, expiry, refusal, a hostile server rewriting the terms, an underfunded agent, refunds, restarts and concurrency.
 
 ## What is not covered
+
+- **USDC settlement has only run on the simulated ledger.** The token path is tested end to end with the real x402 client, server and facilitator verification, a wallet stand-in, and mirror-node-shaped records. It has not been run on Hedera testnet, and HashPack signing a token transfer is unverified.
 
 - **Real testnet settlement has not been run from this repository's tests.** The testnet code paths (real facilitator, mirror verification, Hedera Consensus Service posting, merchant refunds) use the official SDK and packages but need credentials to exercise. Run `npm run live:check` to prove them in your environment.
 - **Real wallet signing has not been tried with HashPack.** The signed payment is tested with a key emulating a wallet, through the official facilitator verification. HashPack accepting it is unverified.

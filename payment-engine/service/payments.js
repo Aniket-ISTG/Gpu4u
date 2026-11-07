@@ -5,7 +5,7 @@ const path = require("node:path");
 const { describeSignedTransaction, saveRejectedPayment } = require("./tx-diagnostic");
 const { PaymentStatus, ApprovalStatus, IN_FLIGHT } = require("./states");
 const { ApprovalError } = require("./approvals");
-const { tinybarsToHbarString } = require("./rate");
+const { formatAmount } = require("./asset");
 const { checkWalletPayload } = require("./payload-check");
 const { transactionLinks, topicLinks, accountLinks } = require("./links");
 const { secondsToCap } = require("./metering");
@@ -126,7 +126,7 @@ class PaymentService {
         const quote = this.store.getQuote(payment.quoteId);
         this.move(paymentId, PaymentStatus.AWAITING_SIGNATURE, {}, {
             type: "WALLET_SIGNATURE_REQUESTED",
-            details: { wallet: quote.wallet, payTo: quote.payTo, tinybars: quote.tinybars, signBy: new Date(quote.expiresAt).toISOString() },
+            details: { wallet: quote.wallet, payTo: quote.payTo, tinybars: quote.tinybars, asset: quote.asset.id, signBy: new Date(quote.expiresAt).toISOString() },
         });
         return null;
     }
@@ -190,7 +190,7 @@ class PaymentService {
         return {
             paymentId,
             required,
-            expected: { payTo: quote.payTo, tinybars: quote.tinybars },
+            expected: { payTo: quote.payTo, tinybars: quote.tinybars, asset: quote.asset.id },
             wallet: quote.wallet,
             memo: "gpu4u:" + quote.id,
             expiresAt: quote.expiresAt,
@@ -230,7 +230,7 @@ class PaymentService {
         this.audit.append({
             paymentId, eventType: "PAYMENT_SIGNED_BY_WALLET", status: PaymentStatus.SIGNING,
             transactionId: check.transactionId,
-            details: { payer: quote.wallet, payTo: quote.payTo, tinybars: quote.tinybars },
+            details: { payer: quote.wallet, payTo: quote.payTo, tinybars: quote.tinybars, asset: quote.asset.id },
         });
 
         this.track(this.settleSigned(paymentId, paymentPayload));
@@ -361,6 +361,7 @@ class PaymentService {
             payer: payerAccountId,
             payTo: quote.payTo,
             tinybars: quote.tinybars,
+            asset: quote.asset,
             feePayers: await this.knownFeePayers(),
         });
         if (!verification.verified) {
@@ -375,7 +376,7 @@ class PaymentService {
         this.move(paymentId, PaymentStatus.CONFIRMED,
             { settlement: { facilitator: result.settlement, payer: payerAccountId, ...verification } },
             { type: "SETTLEMENT_VERIFIED", transactionId: result.transactionId,
-              details: { consensusTimestamp: verification.consensusTimestamp, feePayer: verification.feePayer, tinybars: quote.tinybars, payer: payerAccountId } });
+              details: { consensusTimestamp: verification.consensusTimestamp, feePayer: verification.feePayer, tinybars: quote.tinybars, asset: quote.asset.id, payer: payerAccountId } });
 
         // The lease exists only now, after the payment was confirmed on the ledger.
         const lease = this.leases.create({ payment: this.store.getPayment(paymentId), quote });
@@ -506,7 +507,7 @@ class PaymentService {
         const lease = this.store.getLeaseByPayment(paymentId);
         return {
             payment,
-            quote: { ...quote, hbar: tinybarsToHbarString(quote.tinybars) },
+            quote: this.quoteView(quote),
             approval: approval ? { ...approval, signature: undefined } : null,
             lease,
             events: this.audit.list(paymentId),
@@ -514,6 +515,16 @@ class PaymentService {
             links: this.linksFor(payment, lease),
             payerMode: this.config.payer.mode,
             serverTime: this.now(),
+        };
+    }
+
+    /** A stored quote with the amount in the asset's own units, ready to show. */
+    quoteView(quote) {
+        return {
+            ...quote,
+            amountDisplay: formatAmount(quote.tinybars, quote.asset),
+            assetSymbol: quote.asset.symbol,
+            hbar: quote.asset.native ? formatAmount(quote.tinybars, quote.asset) : null,
         };
     }
 
@@ -561,6 +572,8 @@ class PaymentService {
                 hourlyUsd: quote.hourlyUsd,
                 paidTinybars: quote.tinybars,
                 paidHbar: view.quote.hbar,
+                paidDisplay: view.quote.amountDisplay,
+                asset: quote.asset,
                 rate: quote.rate,
             },
             payment: {
@@ -577,6 +590,7 @@ class PaymentService {
                 billingBasis: reconciliation ? reconciliation.billingBasis : null,
                 billingNote: reconciliation ? reconciliation.billingNote : null,
                 billedHbar: reconciliation ? reconciliation.billedHbar : null,
+                billedDisplay: reconciliation ? reconciliation.billedDisplay : null,
                 billedUsd: reconciliation ? reconciliation.actualUsd : null,
                 billedSeconds: lease.run && lease.run.billedSeconds != null ? lease.run.billedSeconds : null,
                 runStatus: reconciliation ? reconciliation.runStatus : null,

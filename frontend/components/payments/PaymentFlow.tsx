@@ -348,8 +348,8 @@ export default function PaymentFlow({ routed, request, auto = false }: Props) {
               {view.payment.error}
               <span className="mt-1 block text-xs text-red-200">
                 {view.payment.transactionId
-                  ? "Check the transaction on HashScan to see whether any HBAR moved."
-                  : "No HBAR was moved. The audit trail below shows exactly where it stopped."}
+                  ? "Check the transaction on HashScan to see whether any money moved."
+                  : "No money was moved. The audit trail below shows exactly where it stopped."}
               </span>
             </p>
           )}

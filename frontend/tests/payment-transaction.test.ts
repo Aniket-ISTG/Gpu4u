@@ -71,6 +71,37 @@ test("builds the transfer the x402 exact scheme requires: payer to merchant, wit
   assert.equal(decode(tx).transactionMemo, "gpu4u:q_abc");
 });
 
+const USDC = "0.0.429274";
+const tokenTransfersOf = (tx: TransferTransaction) => {
+  const out = new Map<string, Map<string, string>>();
+  for (const [token, accounts] of decode(tx).tokenTransfers) {
+    out.set(token.toString(), new Map([...accounts].map(([account, amount]) => [account.toString(), amount.toString()])));
+  }
+  return out;
+};
+
+test("a token (USDC) payment moves exactly the quoted units of that token, and no HBAR", () => {
+  const tx = buildPaymentTransaction({ terms: terms({ asset: USDC, amount: "420000" }), payerAccountId: PAYER, nodeAccountId: "0.0.3" });
+  assert.equal(transfersOf(tx).size, 0, "the transfer carries no HBAR");
+  const byToken = tokenTransfersOf(tx);
+  assert.deepEqual([...byToken.keys()], [USDC], "exactly one token moves");
+  assert.deepEqual([...byToken.get(USDC)!].sort(), [[PAYER, "-420000"], [MERCHANT, "420000"]]);
+  assert.equal(decode(tx).transactionId?.accountId?.toString(), FEE_PAYER, "the facilitator is still the fee payer");
+});
+
+test("selects a token option only when the quote was in that token", () => {
+  const usdcExpected = { payTo: MERCHANT, tinybars: "420000", asset: USDC };
+  assert.deepEqual(selectTerms(required(terms({ asset: USDC, amount: "420000" })), usdcExpected).asset, USDC);
+  // HBAR offered for a USDC quote, or USDC offered for an HBAR quote, is refused either way.
+  assert.throws(() => selectTerms(required(terms({ amount: "420000" })), usdcExpected), (e: unknown) => e instanceof PaymentBuildError && /not the quoted token/.test(e.message));
+  assert.throws(() => selectTerms(required(terms({ asset: USDC })), expected), (e: unknown) => e instanceof PaymentBuildError && /not native HBAR/.test(e.message));
+  assert.throws(() => selectTerms(required(terms({ asset: "0.0.999999", amount: "420000" })), usdcExpected), (e: unknown) => e instanceof PaymentBuildError);
+});
+
+test("refuses a payment asset that is not a valid token id", () => {
+  assert.throws(() => buildPaymentTransaction({ terms: terms({ asset: "usdc", amount: "5" }), payerAccountId: PAYER }), (e: unknown) => e instanceof PaymentBuildError);
+});
+
 test("pins the transfer to ONE node, so a wallet's single signature is valid for every copy", () => {
   // A wallet signs one transaction body. With the SDK's default of several nodes, one signature is invalid for
   // the other copies and the official facilitator rejects the payment as signature_invalid.

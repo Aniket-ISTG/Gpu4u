@@ -4,7 +4,7 @@ const { x402Client } = require("@x402/core/client");
 const { decodePaymentResponseHeader } = require("@x402/core/http");
 const { wrapFetchWithPayment } = require("@x402/fetch");
 const { ExactHederaScheme } = require("@x402/hedera/exact/client");
-const { HBAR_ASSET_ID } = require("@x402/hedera");
+const { HBAR } = require("./asset");
 
 const NETWORK = "hedera:testnet";
 const MAX_TIMEOUT_SECONDS = 600;
@@ -28,10 +28,11 @@ function checkTerms({ requirements, quote, knownFeePayers }) {
     const problems = [];
     if (requirements.scheme !== "exact") problems.push("Scheme is " + requirements.scheme + ", expected exact");
     if (requirements.network !== NETWORK) problems.push("Network is " + requirements.network + ", expected " + NETWORK);
-    if (requirements.asset !== HBAR_ASSET_ID) problems.push("Asset is " + requirements.asset + ", expected native HBAR");
+    const asset = quote.asset || HBAR;
+    if (requirements.asset !== asset.id) problems.push("Asset is " + requirements.asset + ", the approved quote is in " + asset.symbol + " (" + asset.id + ")");
     if (requirements.payTo !== quote.payTo) problems.push("Pay-to is " + requirements.payTo + ", the approved quote names " + quote.payTo);
     if (String(requirements.amount) !== String(quote.tinybars)) {
-        problems.push("Amount is " + requirements.amount + " tinybars, the approved quote is exactly " + quote.tinybars);
+        problems.push("Amount is " + requirements.amount + " " + asset.unit + ", the approved quote is exactly " + quote.tinybars);
     }
     const feePayer = requirements.extra && requirements.extra.feePayer;
     if (!feePayer || !knownFeePayers.includes(feePayer)) {
@@ -80,7 +81,7 @@ class PaymentAgent {
             schemes: [{ network: "hedera:*", client: new ExactHederaScheme(this.signer) }],
             spendControls: {
                 maxAmountPerPayment: false,
-                allowedAssets: [{ network: NETWORK, asset: HBAR_ASSET_ID, maxAmountPerPayment: String(quote.tinybars) }],
+                allowedAssets: [{ network: NETWORK, asset: (quote.asset || HBAR).id, maxAmountPerPayment: String(quote.tinybars) }],
             },
         });
 

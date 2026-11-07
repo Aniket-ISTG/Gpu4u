@@ -98,12 +98,18 @@ async function buildServices(config, overrides = {}) {
         merchantAccountId = config.hedera.merchantAccountId || SIM_IDS.merchant;
         feePayerId = config.facilitator.feePayerAccountId || SIM_IDS.feePayer;
         const start = BigInt(Math.round(config.simulation.startingBalanceHbar)) * TINYBARS;
+        // A token payment needs the token on the paying account, and the merchant associated with it.
+        const asset = config.asset;
+        const startToken = BigInt(Math.round(config.simulation.startingBalanceToken)) * 10n ** BigInt(asset.decimals);
         if (!walletPayer) {
             agentKey = sdk.PrivateKey.generateECDSA();
             agentAccountId = config.hedera.agentAccountId || SIM_IDS.agent;
-            ledger.addAccount(agentAccountId, { key: agentKey.publicKey, balance: start });
+            ledger.addAccount(agentAccountId, { key: agentKey.publicKey, balance: start, tokens: asset.native ? {} : { [asset.id]: startToken } });
         }
-        ledger.addAccount(merchantAccountId, { balance: ledger.balanceOf(merchantAccountId) });
+        ledger.addAccount(merchantAccountId, {
+            balance: ledger.balanceOf(merchantAccountId),
+            tokens: asset.native ? {} : { [asset.id]: ledger.balanceOf(merchantAccountId, asset.id) },
+        });
         ledger.addAccount(feePayerId, { key: feeKey.publicKey, balance: start });
 
         facilitator = createFacilitator(createSimulatedFacilitatorSigner({ ledger, feePayerId }));
@@ -159,6 +165,7 @@ async function buildServices(config, overrides = {}) {
     const quotes = new QuoteService({
         store, rates, policy, merchantAccountId,
         network: NETWORK, ttlSeconds: config.quoteTtlSeconds,
+        asset: config.asset,
         walletChecker: walletPayer ? walletChecker : null,
         now,
     });

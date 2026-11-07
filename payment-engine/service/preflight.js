@@ -29,6 +29,39 @@ function keyMatchesAccount(privateKey, mirrorKey) {
 }
 
 /**
+ * Checks the payment token: it exists, is a fungible token, is usable, has the decimals this service
+ * assumes, and the merchant can receive it. Without association the transfer would fail on the ledger
+ * after the user had already signed, so it is better to refuse to start.
+ */
+async function checkToken({ mirror, fetchImpl, asset, merchantId, problems, report }) {
+    const token = await mirrorJson(fetchImpl, `${mirror}/api/v1/tokens/${asset.id}`);
+    if (!token) {
+        problems.push(`Token ${asset.id} does not exist on Hedera testnet. Set USDC_TOKEN_ID to a token that does`);
+        return;
+    }
+    if (token.type && token.type !== "FUNGIBLE_COMMON") problems.push(`Token ${asset.id} is ${token.type}, not a fungible token`);
+    if (token.deleted) problems.push(`Token ${asset.id} no longer exists on the ledger`);
+    if (token.pause_status === "PAUSED") problems.push(`Token ${asset.id} is paused, so it cannot be transferred`);
+    if (Number(token.decimals) !== asset.decimals) {
+        problems.push(`Token ${asset.id} has ${token.decimals} decimals, but this service assumes ${asset.decimals}. Amounts would be wrong`);
+    }
+
+    const held = await mirrorJson(fetchImpl, `${mirror}/api/v1/accounts/${merchantId}/tokens?token.id=${asset.id}`);
+    const associated = ((held && held.tokens) || []).some((t) => t.token_id === asset.id);
+    if (!associated) {
+        const account = await mirrorJson(fetchImpl, `${mirror}/api/v1/accounts/${merchantId}`);
+        // -1 means unlimited automatic associations, a positive number is a limit, and 0 means none.
+        const slots = account ? Number(account.max_automatic_token_associations || 0) : 0;
+        if (slots === 0) {
+            problems.push(`Merchant ${merchantId} is not associated with ${asset.symbol} (${asset.id}), so it cannot receive it. Associate it (TokenAssociateTransaction) or set maxAutomaticTokenAssociations on the account`);
+            return;
+        }
+        report.push(`Merchant ${merchantId} receives ${asset.symbol} through automatic association`);
+    }
+    report.push(`Payment asset: ${token.symbol || asset.symbol} (${asset.id}) · ${token.decimals} decimals · merchant can receive it`);
+}
+
+/**
  * Checks, before the service accepts any request, that everything real testnet mode depends on is there:
  * the accounts exist, their keys really are theirs, they have HBAR to work with, the exchange rate is
  * readable, and the audit topic exists and only accepts this service's key. It never substitutes
@@ -81,11 +114,22 @@ async function runPreflight({ config, services, fetchImpl = fetch }) {
         report.push(`${a.label}: ${a.id} · ${hbar.toFixed(4)} HBAR · ${a.key ? "key verified" : "no key needed"}${accountLinks({ accountId: a.id, simulated: false }).hashscan ? " · " + accountLinks({ accountId: a.id, simulated: false }).hashscan : ""}`);
     }
 
-    try {
-        const rate = await services.rates.getRate();
-        report.push(`Exchange rate: $${rate.usdPerHbar.toFixed(6)} per HBAR (${rate.source})`);
-    } catch (error) {
-        problems.push(error.message);
+    const asset = config.asset;
+    if (asset.native) {
+        try {
+            const rate = await services.rates.getRate();
+            report.push(`Exchange rate: $${rate.usdPerHbar.toFixed(6)} per HBAR (${rate.source})`);
+        } catch (error) {
+            problems.push(error.message);
+        }
+    } else {
+        // A token payment needs no exchange rate, but the token must exist, be the one configured (same
+        // decimals), and the merchant must be able to receive it.
+        try {
+            await checkToken({ mirror, fetchImpl, asset, merchantId: config.hedera.merchantAccountId, problems, report });
+        } catch (error) {
+            problems.push(`Could not check ${asset.symbol} (${asset.id}): ${error.message}`);
+        }
     }
 
     if (problems.length) throw new PreflightError(problems);

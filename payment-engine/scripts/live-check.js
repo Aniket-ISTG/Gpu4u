@@ -16,6 +16,10 @@
  *
  * Needs, in .env: the merchant and facilitator fee-payer accounts and keys (see .env.example) and a funded
  * test payer account: HEDERA_TEST_PAYER_ID and HEDERA_TEST_PAYER_KEY.
+ *
+ * With PAYMENT_ASSET=usdc the payment is made in the HTS token (Circle's testnet USDC by default). Then the
+ * payer must hold USDC and be associated with it, and the merchant must be associated too (see
+ * `npm run associate`). The payer still needs no HBAR for the payment itself: the fee payer pays the fee.
  */
 
 require("dotenv").config();
@@ -87,7 +91,9 @@ async function main() {
             hours: 0.005, hourlyUsd: 3.6, estimateUsd: 0.018, capUsd: 0.03,
         });
         console.log("");
-        say("Quote", `${quote.hbar} HBAR (cap $${quote.capUsd}) at $${quote.rate.usdPerHbar.toFixed(6)}/HBAR`);
+        say("Quote", quote.asset.native
+            ? `${quote.amountDisplay} HBAR (cap $${quote.capUsd}) at $${quote.rate.usdPerHbar.toFixed(6)}/HBAR`
+            : `${quote.amountDisplay} ${quote.assetSymbol} (cap $${quote.capUsd}), token ${quote.asset.id}, no exchange rate`);
 
         const started = services.payments.start({ quoteId: quote.id });
         say("Policy", `${started.payment.decision} -> ${started.payment.status}`);

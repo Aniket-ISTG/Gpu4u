@@ -3,7 +3,7 @@
 const crypto = require("node:crypto");
 const { ApprovalStatus } = require("./states");
 const { verifyWalletSignature } = require("./wallet-signature");
-const { tinybarsToHbarString } = require("./rate");
+const { formatAmount } = require("./asset");
 
 class ApprovalError extends Error {
     constructor(code, message, status = 400) {
@@ -23,7 +23,7 @@ function approvalMessage({ payment, quote, approvalId, expiresAt }) {
         `Payment: ${payment.id}`,
         `Wallet: ${quote.wallet}`,
         `Pay to: ${quote.payTo}`,
-        `Amount: ${tinybarsToHbarString(quote.tinybars)} HBAR (${quote.tinybars} tinybars)`,
+        `Amount: ${formatAmount(quote.tinybars, quote.asset)} ${quote.asset.symbol} (${quote.tinybars} ${quote.asset.unit})`,
         `Cap: $${quote.capUsd.toFixed(2)} USD`,
         `GPU: ${quote.offer.gpuModel} x${quote.offer.gpuCount} from ${quote.offer.provider}`,
         `Terms: ${quote.termsHash.slice(0, 16)}`,
