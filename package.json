@@ -1,0 +1,16 @@
+{
+  "name": "gpu4u",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GPU4U: web app and x402 payment service, run and deployed as one unit",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "install:all": "npm ci --prefix payment-engine && npm ci --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "start": "node start.js",
+    "dev:web": "npm run dev --prefix frontend",
+    "dev:payments": "npm start --prefix payment-engine"
+  }
+}

@@ -145,6 +145,29 @@ Open http://localhost:3000, go to **Get Started**, connect a wallet from the nav
 - **Real testnet:** HashPack signs every payment. Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (free at https://cloud.reown.com).
 - **Simulated (development):** paste an account ID. It identifies you but cannot sign.
 
+
+### Run or deploy everything as one unit
+
+The web app and the payment service also run together from the repo root, with one command and one set of variables (see [.env.example](.env.example)):
+
+```bash
+npm run install:all
+npm run build
+SERVICE_TOKEN=$(openssl rand -hex 24) npm start    # web app on $PORT (default 3000)
+```
+
+`start.js` starts the payment service on `127.0.0.1:4021` (private), waits for its health check, then starts the web app, which reaches it on localhost. Only the web app is public. If either process stops, both stop so the host restarts them.
+
+**Deploy on Railway (or any Docker host):**
+
+1. Push the repo to GitHub.
+2. Create a service from the repo. The `Dockerfile` is picked up automatically.
+3. Add the variables from `.env.example`. `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` must be set before the build.
+4. Generate a public domain and open it.
+5. Add that domain to your WalletConnect project's allowed domains.
+
+`DB_PATH=:memory:` keeps payment history in memory only, so it resets on restart. To keep it, attach a volume at `/data` and set `DB_PATH=/data/payments.sqlite`. Run a single instance only.
+
 ## Configuration
 
 **`frontend/.env.local`**
